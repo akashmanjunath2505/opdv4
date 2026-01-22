@@ -207,11 +207,11 @@ export const generateClinicalNote = async (
     // Stage 1: Cleanup
     const cleanedTranscript = await cleanupTranscript(transcript, language);
 
-    // Stage 2: SOAP (Subjective, Objective, Assessment)
-    const soapNote = await generateSoapNote(cleanedTranscript, language);
-
-    // Stage 3: Prescription (Plan)
-    const prescription = await generatePrescription(cleanedTranscript, language);
+    // Stage 2 & 3: SOAP and Prescription in parallel (both only depend on cleanedTranscript)
+    const [soapNote, prescription] = await Promise.all([
+      generateSoapNote(cleanedTranscript, language),
+      generatePrescription(cleanedTranscript, language)
+    ]);
 
     // Combine for final output
     return `${soapNote}\n\n${prescription}`;
