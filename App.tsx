@@ -1,5 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import logo from './assets/logo.png';
 import { Sidebar } from './components/Sidebar';
 import { ChatView } from './components/ChatView';
 import { UserRole, Chat, Message, PreCodedGpt, DoctorProfile, ClinicalProtocol } from './types';
@@ -134,7 +135,7 @@ const App: React.FC = () => {
               <div className="mb-8 flex justify-center">
                 <div className="relative">
                   <div className="absolute inset-0 bg-aivana-accent opacity-20 blur-3xl rounded-full"></div>
-                  <Icon name="sparkles" className="w-24 h-24 text-aivana-accent relative z-10" />
+                  <img src={logo} alt="Aivana Logo" className="w-32 h-auto relative z-10 object-contain drop-shadow-2xl" />
                 </div>
               </div>
 
