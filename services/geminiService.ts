@@ -58,7 +58,7 @@ export const processAudioSegment = async (
     };
 
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: { parts: [audioPart, { text: "Transcribe and normalize this clinical segment." }] },
       config: {
         systemInstruction,
@@ -109,7 +109,7 @@ export const cleanupTranscript = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `Raw Transcript:\n${transcript}`,
       config: { systemInstruction, temperature: 0 },
     });
@@ -143,7 +143,7 @@ export const generateSoapNote = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `Cleaned Transcript:\n${cleanedTranscript}`,
       config: { systemInstruction, temperature: 0 },
     });
@@ -188,7 +188,7 @@ export const generatePrescription = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `Cleaned Transcript:\n${cleanedTranscript}`,
       config: { systemInstruction, temperature: 0 },
     });
@@ -245,7 +245,7 @@ export const generateClinicalNote = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `Clinical Transcript:\n${transcript}`,
       config: {
         systemInstruction,
@@ -293,7 +293,7 @@ export const generateCaseSummary = async (messages: Message[], language: string,
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: transcript,
       config: { systemInstruction }
     });
@@ -310,7 +310,7 @@ export const getPromptInsights = async (prompt: string, doctorProfile: DoctorPro
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         systemInstruction,
