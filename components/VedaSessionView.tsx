@@ -9,7 +9,7 @@ import { processAudioSegment, generateClinicalNote } from '../services/geminiSer
 import { renderMarkdownToHTML } from '../utils/markdownRenderer';
 
 interface ScribeSessionViewProps {
-    onEndSession: void;
+    onEndSession: () => void;
     doctorProfile: DoctorProfile;
     language: string;
 }
@@ -287,10 +287,16 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         setPhase('processing');
         const finalBlob = await stopRecording();
         if (finalBlob) await processSegment(finalBlob, pendingSegmentsQueue.current.length);
+
+        // Wait for all segments to process
         let attempts = 0;
-        const checkDone = setInterval(() => {
-            if (processedSegmentsRef.current >= pendingSegmentsQueue.current.length || attempts > 10) {
+        const checkDone = setInterval(async () => {
+            if (processedSegmentsRef.current >= pendingSegmentsQueue.current.length || attempts > 20) { // Increased timeout safety
                 clearInterval(checkDone);
+
+                // Auto-generate note before switching to review
+                await handleGenerateNote();
+
                 setPhase('review');
             }
             attempts++;
@@ -418,12 +424,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                     </div>
 
                     <div className="p-6 border-b border-white/5 bg-black/40 flex flex-col gap-4">
-                        {!clinicalNote ? (
-                            <button onClick={handleGenerateNote} disabled={isGeneratingNote || transcriptHistory.length === 0} className="w-full py-4 bg-aivana-accent text-white rounded-2xl font-bold text-sm shadow-xl flex items-center justify-center gap-3 disabled:opacity-20 hover:bg-purple-600 transition-all">
-                                {isGeneratingNote ? <div className="w-4 h-4 border-2 border-t-transparent border-white rounded-full animate-spin"></div> : <Icon name="sparkles" className="w-4 h-4" />}
-                                {isGeneratingNote ? 'Generating Note...' : 'Synthesize Clinical SOAP'}
-                            </button>
-                        ) : (
+                        {clinicalNote && (
                             <button onClick={handleDownloadPDF} className="w-full py-3.5 bg-aivana-accent text-white rounded-xl font-bold text-[11px] uppercase tracking-widest shadow-lg shadow-aivana-accent/30 hover:bg-purple-600 transition-all">Export Prescription</button>
                         )}
                     </div>
