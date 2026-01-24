@@ -207,6 +207,9 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const transcriptEndRef = useRef<HTMLDivElement>(null);
 
+    // Background generation state
+    const backgroundGenerationPromise = useRef<Promise<PrescriptionData | null> | null>(null);
+
     const { isRecording, startRecording, stopRecording } = useAudioRecorder();
     const { startListening, stopListening, interimTranscript } = useSpeechRecognition({ lang: sessionLanguage });
 
@@ -259,8 +262,10 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         setDuration(0);
         setTranscriptHistory([]);
         setClinicalNote('');
+        setClinicalNote('');
         processedSegmentsRef.current = 0;
         pendingSegmentsQueue.current = [];
+        backgroundGenerationPromise.current = null; // Reset background promise
         await startRecording({
             segmentDuration: 45000,
             vadThreshold: 0.02,
@@ -284,6 +289,13 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             if (processedSegmentsRef.current >= pendingSegmentsQueue.current.length || attempts > 10) {
                 clearInterval(checkDone);
                 setPhase('review');
+
+                // Start background generation immediately when processing is done
+                const fullTranscript = transcriptHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
+                if (fullTranscript.trim()) {
+                    console.log("Starting background note generation...");
+                    backgroundGenerationPromise.current = generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
+                }
             }
             attempts++;
         }, 500);
@@ -291,13 +303,25 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
     const handleGenerateNote = async () => {
         setIsGeneratingNote(true);
-        const fullTranscript = transcriptHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
-        const noteData = await generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
-        if (noteData) {
-            setPrescriptionData(noteData);
-            setClinicalNote("Generated"); // Set a truthy value to trigger UI state
+
+        // Use background promise if available, otherwise start new generation
+        const notePromise = backgroundGenerationPromise.current || (() => {
+            const fullTranscript = transcriptHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
+            return generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
+        })();
+
+        try {
+            const noteData = await notePromise;
+            if (noteData) {
+                setPrescriptionData(noteData);
+                setClinicalNote("Generated");
+            }
+        } catch (error) {
+            console.error("Error fetching generated note:", error);
+        } finally {
+            setIsGeneratingNote(false);
+            backgroundGenerationPromise.current = null; // Clear promise after use
         }
-        setIsGeneratingNote(false);
     };
 
     const handleDownloadPDF = () => {
