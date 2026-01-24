@@ -7,6 +7,7 @@ import {
   PromptInsight,
   ClinicalProtocol,
   UserRole,
+  PrescriptionData,
 } from '../types';
 import { runNexusWorkflow } from '../engine/workflow';
 import { prescriptionDictionary } from '../prescription_dictionary';
@@ -198,26 +199,90 @@ export const generatePrescription = async (
   }
 };
 
+// FIX: Unified single-shot generation for speed and consistency
 export const generateClinicalNote = async (
   transcript: string,
   doctorProfile: DoctorProfile,
   language: string
-): Promise<string> => {
+): Promise<PrescriptionData | null> => {
+  const dictionaryContext = JSON.stringify(prescriptionDictionary);
+  const protocolsContext = JSON.stringify(CLINICAL_PROTOCOLS);
+
+  const systemInstruction = `
+    You are an expert Medical Scribe and Clinical Pharmacologist.
+    
+    TASK: Analyze the raw clinical transcript and generate a structured clinical note (SOAP + Prescription) in a SINGLE pass.
+    
+    INPUT CONTEXT:
+    - Raw Transcript of Doctor-Patient conversation.
+    - Doctor Profile: ${JSON.stringify(doctorProfile)}
+    
+    REFERENCE DATA:
+    - Drug Dictionary: ${dictionaryContext}
+    - Clinical Protocols: ${protocolsContext}
+    
+    LANGUAGE RULE:
+    ${language === 'Auto-detect' ? 'Detect the primary language used by the doctor. Write the output in that language (using native script if applicable, e.g., Devanagari for Hindi).' : `Write the output strictly in ${language} (using native script where applicable).`}
+    
+    GENERATION RULES:
+    1. **Cleanup First**: Internally clean the transcript to remove fillers and correct medical terms before extraction.
+    2. **Subjective**: Summarize patient's complaints/symptoms.
+    3. **Objective**: Summarize physical findings.
+    4. **Assessment**: Primary diagnosis.
+    5. **Differential Diagnosis**: Other potential diagnoses considered.
+    6. **Lab Results**: Any tests, vitals, or investigations mentioned.
+    7. **Advice**: Diet, lifestyle, follow-up instructions (excluding medicines).
+    
+    PRESCRIPTION RULES (Critical):
+    1. EXTRAPOLATE NOTHING. Only extract drugs explicitly mentioned.
+    2. VALIDATE drug names against the provided Dictionary. Fix spellings if close match found.
+    3. EXTRACT 4 fields per drug: Name, Dosage, Frequency, Route.
+    4. If a field is missing, use "Not specified" or infer strictly from context (e.g. "popping pills" -> Route: Oral).
+    
+    OUTPUT FORMAT:
+    Return strictly JSON matching the schema. NO Markdown.
+  `;
+
   try {
-    // Stage 1: Cleanup
-    const cleanedTranscript = await cleanupTranscript(transcript, language);
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Clinical Transcript:\n${transcript}`,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        temperature: 0,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            subjective: { type: Type.STRING },
+            objective: { type: Type.STRING },
+            assessment: { type: Type.STRING },
+            differentialDiagnosis: { type: Type.STRING },
+            labResults: { type: Type.STRING },
+            advice: { type: Type.STRING },
+            medicines: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  dosage: { type: Type.STRING },
+                  frequency: { type: Type.STRING },
+                  route: { type: Type.STRING },
+                },
+                required: ['name', 'dosage', 'frequency', 'route'],
+              },
+            },
+          },
+          required: ['subjective', 'objective', 'assessment', 'medicines', 'advice'],
+        },
+      },
+    });
 
-    // Stage 2 & 3: SOAP and Prescription in parallel (both only depend on cleanedTranscript)
-    const [soapNote, prescription] = await Promise.all([
-      generateSoapNote(cleanedTranscript, language),
-      generatePrescription(cleanedTranscript, language)
-    ]);
-
-    // Combine for final output
-    return `${soapNote}\n\n${prescription}`;
+    return JSON.parse(response.text || 'null') as PrescriptionData;
   } catch (error) {
-    console.error("Clinical note orchestration error:", error);
-    return 'Error generating clinical note.';
+    console.error("Unified clinical note generation error:", error);
+    return null;
   }
 };
 

@@ -1,6 +1,23 @@
 
 import type { ReactElement } from 'react';
 
+export interface Medicine {
+    name: string;
+    dosage: string;
+    frequency: string;
+    route: string;
+}
+
+export interface PrescriptionData {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    differentialDiagnosis: string;
+    labResults: string;
+    medicines: Medicine[];
+    advice: string;
+}
+
 export enum UserRole {
   DOCTOR = 'Doctor',
 }

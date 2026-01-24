@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { DoctorProfile, TranscriptEntry } from '../types';
+import { DoctorProfile, TranscriptEntry, PrescriptionData } from '../types';
 import { Icon } from './Icon';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -18,22 +18,7 @@ interface PatientDemographics {
     date: string; hospitalName: string; hospitalAddress: string; hospitalPhone: string;
 }
 
-interface Medicine {
-    name: string;
-    dosage: string;
-    frequency: string;
-    route: string;
-}
 
-interface PrescriptionData {
-    subjective: string;
-    objective: string;
-    assessment: string;
-    differentialDiagnosis: string;
-    labResults: string;
-    medicines: Medicine[];
-    advice: string;
-}
 
 // FIX: Added missing AudioWaveform component to visualize signal acquisition
 // Corrected: Explicitly using React namespace by adding import to resolve 'Cannot find namespace React'
@@ -244,38 +229,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const parseClinicalNote = (note: string): PrescriptionData => {
-        const getSectionContent = (title: string) => {
-            if (!note) return "";
-            const regex = new RegExp(`##\\s*${title}[^]*?(?=##|$)`, 'i');
-            const match = note.match(regex);
-            if (!match) return "";
-            return stripMarkdown(match[0].replace(new RegExp(`##\\s*${title}`, 'i'), '').trim());
-        };
 
-        const planContent = getSectionContent('Plan');
-        const planLines = planContent.split('\n').map(l => l.trim()).filter(Boolean);
-        const medicines = planLines.filter(l => l.includes('|')).map(line => {
-            const parts = line.split('|').map(p => p.trim());
-            return {
-                name: parts[0] || '',
-                dosage: parts[1] || '',
-                frequency: parts[2] || '',
-                route: parts[3] || ''
-            };
-        });
-        const adviceLines = planLines.filter(l => !l.includes('|'));
-
-        return {
-            subjective: getSectionContent('Subjective'),
-            objective: getSectionContent('Objective'),
-            assessment: getSectionContent('Assessment'),
-            differentialDiagnosis: getSectionContent('Differential Diagnosis'),
-            labResults: getSectionContent('Lab Results'),
-            medicines,
-            advice: adviceLines.join('\n')
-        };
-    };
 
     const processSegment = useCallback(async (blob: Blob, index: number) => {
         const reader = new FileReader();
@@ -338,9 +292,11 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const handleGenerateNote = async () => {
         setIsGeneratingNote(true);
         const fullTranscript = transcriptHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
-        const note = await generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
-        setClinicalNote(note);
-        setPrescriptionData(parseClinicalNote(note));
+        const noteData = await generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
+        if (noteData) {
+            setPrescriptionData(noteData);
+            setClinicalNote("Generated"); // Set a truthy value to trigger UI state
+        }
         setIsGeneratingNote(false);
     };
 
