@@ -58,7 +58,7 @@ export const processAudioSegment = async (
     };
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash-exp',
       contents: { parts: [audioPart, { text: "Transcribe and normalize this clinical segment." }] },
       config: {
         systemInstruction,
@@ -109,7 +109,7 @@ export const cleanupTranscript = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash-exp',
       contents: `Raw Transcript:\n${transcript}`,
       config: { systemInstruction, temperature: 0 },
     });
@@ -143,7 +143,7 @@ export const generateSoapNote = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash-exp',
       contents: `Cleaned Transcript:\n${cleanedTranscript}`,
       config: { systemInstruction, temperature: 0 },
     });
@@ -188,7 +188,7 @@ export const generatePrescription = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash-exp',
       contents: `Cleaned Transcript:\n${cleanedTranscript}`,
       config: { systemInstruction, temperature: 0 },
     });
@@ -245,7 +245,7 @@ export const generateClinicalNote = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash-exp',
       contents: `Clinical Transcript:\n${transcript}`,
       config: {
         systemInstruction,
@@ -286,14 +286,14 @@ export const generateClinicalNote = async (
   }
 };
 
-// FIX: Implemented generateCaseSummary using gemini-3-flash-preview
+// FIX: Implemented generateCaseSummary using gemini-2.0-flash-exp
 export const generateCaseSummary = async (messages: Message[], language: string, doctorProfile: DoctorProfile): Promise<string> => {
   const systemInstruction = `You are an expert clinical documentalist. Summarize the following doctor-patient conversation into a concise case summary for a medical record. Use ${language}.`;
   const transcript = messages.map(m => `${m.sender}: ${m.text}`).join('\n');
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash-exp',
       contents: transcript,
       config: { systemInstruction }
     });
@@ -310,7 +310,7 @@ export const getPromptInsights = async (prompt: string, doctorProfile: DoctorPro
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash-exp',
       contents: prompt,
       config: {
         systemInstruction,
@@ -354,3 +354,81 @@ export async function* streamChatResponse(params: {
     knowledgeBase: params.knowledgeBaseProtocols,
   });
 }
+// FIX: Added processVoiceEdit to handle voice commands for editing prescription data
+export const processVoiceEdit = async (
+  currentData: PrescriptionData,
+  command: string,
+  doctorProfile: DoctorProfile,
+  language: string
+): Promise<PrescriptionData | null> => {
+  const dictionaryContext = JSON.stringify(prescriptionDictionary);
+
+  const systemInstruction = `
+    You are a Medical Scribe Editor. 
+    
+    TASK: Apply a clinician's voice command to update the current structured Prescription JSON data.
+    
+    CURRENT DATA:
+    ${JSON.stringify(currentData)}
+    
+    DOCTOR PROFILE:
+    ${JSON.stringify(doctorProfile)}
+    
+    DICTIONARY REFERENCE:
+    ${dictionaryContext}
+    
+    COMMAND:
+    "${command}"
+    
+    RULES:
+    1. Update the JSON based strictly on the command.
+    2. If the command asks to "add" a symptom or diagnosis, append it to the existing text or list.
+    3. If the command asks to "change" or "update" a specific value, replace that value.
+    4. For medicines, if a new medicine is mentioned, add it to the list using the Name|Dosage|Frequency|Route structure.
+    5. If a medicine is being updated (e.g., "change Metformin dose"), find the entry and update only that field.
+    6. Maintain the original language or script (${language}) unless specified otherwise.
+    7. Return ONLY the updated JSON. NO markdown, NO explanation.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: `Apply this edit command: ${command}`,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        temperature: 0,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            subjective: { type: Type.STRING },
+            objective: { type: Type.STRING },
+            assessment: { type: Type.STRING },
+            differentialDiagnosis: { type: Type.STRING },
+            labResults: { type: Type.STRING },
+            advice: { type: Type.STRING },
+            medicines: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  dosage: { type: Type.STRING },
+                  frequency: { type: Type.STRING },
+                  route: { type: Type.STRING },
+                },
+                required: ['name', 'dosage', 'frequency', 'route'],
+              },
+            },
+          },
+          required: ['subjective', 'objective', 'assessment', 'medicines', 'advice'],
+        },
+      },
+    });
+
+    return JSON.parse(response.text || 'null') as PrescriptionData;
+  } catch (error) {
+    console.error("Voice edit processing error:", error);
+    return null;
+  }
+};

@@ -17,12 +17,13 @@ export const useLiveScribe = (
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const latestTranscriptRef = useRef(transcriptHistory);
 
-    // Keep ref in sync for async callbacks
-    useEffect(() => {
-        latestTranscriptRef.current = transcriptHistory;
-    }, [transcriptHistory]);
+    // Keep ref in sync for async callbacks (Immediate sync for robustness)
+    const syncTranscriptRef = (history: TranscriptEntry[]) => {
+        latestTranscriptRef.current = history;
+    };
 
     useEffect(() => {
+        syncTranscriptRef(transcriptHistory);
         const currentLength = transcriptHistory.length;
         const diff = currentLength - lastProcessedLengthRef.current;
 

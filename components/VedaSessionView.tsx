@@ -5,6 +5,7 @@ import { Icon } from './Icon';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useLiveScribe } from '../hooks/useLiveScribe';
+import { useVoiceEdit } from '../hooks/useVoiceEdit';
 import { processAudioSegment, generateClinicalNote } from '../services/geminiService';
 import { renderMarkdownToHTML } from '../utils/markdownRenderer';
 
@@ -205,6 +206,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
     const processedSegmentsRef = useRef<number>(0);
     const pendingSegmentsQueue = useRef<Blob[]>([]);
+    const transcriptHistoryRef = useRef<TranscriptEntry[]>([]);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const transcriptEndRef = useRef<HTMLDivElement>(null);
 
@@ -216,6 +218,14 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         transcriptHistory,
         doctorProfile,
         sessionLanguage
+    );
+
+    // Voice Edit Hook
+    const { isListening: isVoiceEditing, isProcessing: isProcessingVoiceEdit, toggleVoiceEdit, interimTranscript: voiceEditInterim } = useVoiceEdit(
+        prescriptionData,
+        doctorProfile,
+        sessionLanguage,
+        setPrescriptionData
     );
 
     useEffect(() => {
@@ -231,41 +241,58 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [transcriptHistory, interimTranscript]);
 
+    // Keep Ref in sync with state for use in async callbacks (Standard Pattern)
+    useEffect(() => {
+        transcriptHistoryRef.current = transcriptHistory;
+    }, [transcriptHistory]);
+
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
+    const processSegment = useCallback((blob: Blob, index: number): Promise<void> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+                try {
+                    const base64Audio = (reader.result as string).split(',')[1];
+                    // Use Ref for context to avoid stale closure dependency on transcriptHistory
+                    const latestTranscript = transcriptHistoryRef.current;
+                    const context = latestTranscript.slice(-3).map(t => `${t.speaker}: ${t.text}`).join(' ');
 
-
-
-    const processSegment = useCallback(async (blob: Blob, index: number) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        reader.onloadend = async () => {
-            const base64Audio = (reader.result as string).split(',')[1];
-            const context = transcriptHistory.slice(-3).map(t => `${t.speaker}: ${t.text}`).join(' ');
-            const results = await processAudioSegment(base64Audio, blob.type, sessionLanguage, doctorProfile, context);
-            if (results) {
-                const newEntries: TranscriptEntry[] = results.map((r, i) => ({
-                    id: `seg-${index}-${i}-${Date.now()}`,
-                    speaker: r.speaker,
-                    text: r.text,
-                    segmentIndex: index
-                }));
-                setTranscriptHistory(prev => {
-                    if (prev.some(e => e.segmentIndex === index)) return prev;
-                    return [...prev, ...newEntries];
-                });
-            }
-            processedSegmentsRef.current++;
-        };
-    }, [sessionLanguage, doctorProfile, transcriptHistory]);
+                    const results = await processAudioSegment(base64Audio, blob.type, sessionLanguage, doctorProfile, context);
+                    if (results) {
+                        const newEntries: TranscriptEntry[] = results.map((r, i) => ({
+                            id: `seg-${index}-${i}-${Date.now()}`,
+                            speaker: r.speaker,
+                            text: r.text,
+                            segmentIndex: index
+                        }));
+                        setTranscriptHistory(prev => {
+                            if (prev.some(e => e.segmentIndex === index)) return prev;
+                            const updated = [...prev, ...newEntries];
+                            // Synchronously update Ref to avoid lag in async processing
+                            transcriptHistoryRef.current = updated;
+                            return updated;
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Error processing segment ${index}:`, err);
+                } finally {
+                    processedSegmentsRef.current++;
+                    resolve();
+                }
+            };
+        });
+    }, [sessionLanguage, doctorProfile]);
 
     const handleStartSession = async () => {
         setPhase('active');
         setDuration(0);
         setTranscriptHistory([]);
+        transcriptHistoryRef.current = [];
         setClinicalNote('');
         processedSegmentsRef.current = 0;
         pendingSegmentsQueue.current = [];
@@ -276,7 +303,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             onSegment: (blob) => {
                 const idx = pendingSegmentsQueue.current.length;
                 pendingSegmentsQueue.current.push(blob);
-                processSegment(blob, idx);
+                processSegment(blob, idx); // Fire and forget during session
             }
         });
         startListening();
@@ -286,18 +313,30 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         stopListening();
         setPhase('processing');
         const finalBlob = await stopRecording();
-        if (finalBlob) await processSegment(finalBlob, pendingSegmentsQueue.current.length);
+        if (finalBlob) {
+            const idx = pendingSegmentsQueue.current.length;
+            pendingSegmentsQueue.current.push(finalBlob);
+            await processSegment(finalBlob, idx); // Properly await the final segment
+        }
 
         // Wait for all segments to process
         let attempts = 0;
         const checkDone = setInterval(async () => {
-            if (processedSegmentsRef.current >= pendingSegmentsQueue.current.length || attempts > 20) { // Increased timeout safety
+            const allProcessed = processedSegmentsRef.current >= pendingSegmentsQueue.current.length;
+            const timedOut = attempts > 10; // 5 seconds timeout
+
+            if (allProcessed || timedOut) {
                 clearInterval(checkDone);
+                console.log(timedOut ? "Stop sequence timed out, forcing generation..." : "All segments processed.");
 
-                // Auto-generate note before switching to review
-                await handleGenerateNote();
-
-                setPhase('review');
+                try {
+                    // Auto-generate note before switching to review
+                    await handleGenerateNote();
+                } catch (err) {
+                    console.error("Note generation failed", err);
+                } finally {
+                    setPhase('review');
+                }
             }
             attempts++;
         }, 500);
@@ -306,25 +345,56 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const handleGenerateNote = async () => {
         setIsGeneratingNote(true);
 
-        // If we have a fresh live note (generated recently), use it immediately!
-        // This gives us the "< 3s" experience.
-        if (liveNote && !isGeneratingBackground) {
-            console.log("Using cached live note for instant result");
-            setPrescriptionData(liveNote);
-            setClinicalNote("Generated");
-            setIsGeneratingNote(false);
-            return;
-        }
+        try {
+            // If we have a fresh live note (generated recently), use it immediately!
+            if (liveNote && !isGeneratingBackground) {
+                console.log("Using cached live note for instant result");
+                setPrescriptionData(liveNote);
+                setClinicalNote("Generated");
+                setIsGeneratingNote(false);
+                return;
+            }
 
-        // Fallback: If no live note or it's stale, do one final quick generation
-        console.log("Generating final note...");
-        const fullTranscript = transcriptHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
-        const noteData = await generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
-        if (noteData) {
-            setPrescriptionData(noteData);
-            setClinicalNote("Generated");
+            // Racing timeout: If generation takes more than 7 seconds, fallback or proceed
+            const generationPromise = (async () => {
+                console.log("Generating final note...");
+
+                // Use Ref as primary (for latest async data), but fallback to State if Ref is unexpectedly empty
+                let latestTranscript = transcriptHistoryRef.current;
+                if (latestTranscript.length === 0 && transcriptHistory.length > 0) {
+                    console.log("Ref empty but State has data, using State as fallback.");
+                    latestTranscript = transcriptHistory;
+                }
+
+                const fullTranscript = latestTranscript.map(t => `${t.speaker}: ${t.text}`).join('\n');
+                console.log("Final Transcript for LLM (Length):", fullTranscript.length);
+
+                if (!fullTranscript.trim()) {
+                    console.warn("Transcript is empty, skipping generation");
+                    // Still transition to review phase
+                    setClinicalNote("Generated");
+                    return;
+                }
+
+                const noteData = await generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
+                if (noteData) {
+                    setPrescriptionData(noteData);
+                    setClinicalNote("Generated");
+                }
+            })();
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Generation Timeout")), 7000)
+            );
+
+            await Promise.race([generationPromise, timeoutPromise]);
+        } catch (error) {
+            console.error("Note generation error or timeout:", error);
+            // Even if it fails, we want the user to be in 'review' phase
+            setClinicalNote("Available");
+        } finally {
+            setIsGeneratingNote(false);
         }
-        setIsGeneratingNote(false);
     };
 
     const handleDownloadPDF = () => {
@@ -433,7 +503,30 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         {clinicalNote ? (
                             <div className="p-6 space-y-10">
                                 <section className="space-y-6">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-aivana-accent mb-5">Prescription Content</h4>
+                                    <div className="flex items-center justify-between mb-5">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-aivana-accent">Prescription Content</h4>
+                                        <button
+                                            onClick={toggleVoiceEdit}
+                                            disabled={isProcessingVoiceEdit}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all ${isVoiceEditing
+                                                ? 'bg-red-500/20 border-red-500/40 text-red-500 animate-pulse'
+                                                : isProcessingVoiceEdit
+                                                    ? 'bg-white/5 border-white/10 text-gray-500 cursor-not-allowed'
+                                                    : 'bg-aivana-accent/10 border-aivana-accent/20 text-aivana-accent hover:bg-aivana-accent/20'
+                                                }`}
+                                        >
+                                            <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-3.5 h-3.5 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
+                                            <span className="text-[9px] font-bold uppercase tracking-wider">
+                                                {isVoiceEditing ? 'Listening...' : isProcessingVoiceEdit ? 'Processing...' : 'Voice Edit'}
+                                            </span>
+                                        </button>
+                                    </div>
+
+                                    {isVoiceEditing && voiceEditInterim && (
+                                        <div className="mb-4 p-3 bg-white/5 border border-white/10 rounded-xl animate-fadeInUp">
+                                            <p className="text-[10px] text-gray-400 italic">"{voiceEditInterim}..."</p>
+                                        </div>
+                                    )}
 
                                     {/* Chief Complaint */}
                                     <div>
@@ -584,7 +677,12 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                     {showPdfPreview && <div className="animate-fadeInUp shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden border border-white/5"><PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview /></div>}
                                 </section>
                             </div>
-                        ) : <div className="h-full flex flex-col items-center justify-center text-center opacity-10"><Icon name="document-text" className="w-16 h-16 mb-4" /><p className="text-[10px] font-black uppercase tracking-[0.4em]">Awaiting Analysis</p></div>}
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-center opacity-10">
+                                <Icon name="document-text" className="w-16 h-16 mb-4" />
+                                <p className="text-[10px] font-black uppercase tracking-[0.4em]">Awaiting Analysis</p>
+                            </div>
+                        )}
                     </div>
                 </aside>
             </div>

@@ -13,7 +13,7 @@ export const queryLlm = async (context: NexusContext): Promise<NexusContext> => 
   
   try {
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-3-flash-preview', // FIX: Using Gemini 3 for complex clinical reasoning
+      model: 'gemini-2.0-flash-exp', // FIX: Using Gemini 3 for complex clinical reasoning
       contents: contents,
       config: {
         systemInstruction: context.systemInstruction,
