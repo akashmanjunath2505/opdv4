@@ -211,7 +211,12 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const transcriptEndRef = useRef<HTMLDivElement>(null);
 
     const { isRecording, startRecording, stopRecording } = useAudioRecorder();
-    const { startListening, stopListening, interimTranscript } = useSpeechRecognition({ lang: sessionLanguage });
+    const { startListening, stopListening, interimTranscript, transcript, resetTranscript } = useSpeechRecognition({ lang: sessionLanguage });
+
+    // Live Transcription State
+    const [liveTranscriptSegments, setLiveTranscriptSegments] = useState<TranscriptEntry[]>([]);
+    const lastProcessedTranscriptLengthRef = useRef(0);
+
 
     // Background Generation Hook
     const { liveNote, isGenerating: isGeneratingBackground } = useLiveScribe(
@@ -245,6 +250,24 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     useEffect(() => {
         transcriptHistoryRef.current = transcriptHistory;
     }, [transcriptHistory]);
+
+    // Handle Live Transcript Accumulation
+    useEffect(() => {
+        if (phase === 'active' && transcript.length > lastProcessedTranscriptLengthRef.current) {
+            const newText = transcript.slice(lastProcessedTranscriptLengthRef.current).trim();
+            if (newText) {
+                const newEntry: TranscriptEntry = {
+                    id: `live-${Date.now()}-${Math.random()}`,
+                    speaker: 'Doctor', // Default for live view
+                    text: newText,
+                    segmentIndex: -1
+                };
+                setLiveTranscriptSegments(prev => [...prev, newEntry]);
+            }
+            lastProcessedTranscriptLengthRef.current = transcript.length;
+        }
+    }, [transcript, phase]);
+
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -293,6 +316,9 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         setDuration(0);
         setTranscriptHistory([]);
         transcriptHistoryRef.current = [];
+        setLiveTranscriptSegments([]);
+        lastProcessedTranscriptLengthRef.current = 0;
+        resetTranscript();
         setClinicalNote('');
         processedSegmentsRef.current = 0;
         pendingSegmentsQueue.current = [];
@@ -307,6 +333,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             }
         });
         startListening();
+
     };
 
     const handleStopSession = async () => {
@@ -455,13 +482,20 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 )}
 
                 <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-black/10">
-                    {transcriptHistory.length === 0 && !interimTranscript && (
+                    {phase === 'active' && liveTranscriptSegments.length === 0 && !interimTranscript && (
                         <div className="h-full flex flex-col items-center justify-center opacity-10">
                             <Icon name="microphone" className="w-16 h-16 mb-4" />
                             <p className="text-[10px] font-black uppercase tracking-[0.4em]">Listening for dialogue...</p>
                         </div>
                     )}
-                    {transcriptHistory.map(entry => (
+                    {phase !== 'active' && transcriptHistory.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center opacity-10">
+                            <Icon name="microphone" className="w-16 h-16 mb-4" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Listening for dialogue...</p>
+                        </div>
+                    )}
+                    {(phase === 'active' ? liveTranscriptSegments : transcriptHistory).map(entry => (
+
                         <div key={entry.id} className={`flex gap-6 animate-fadeInUp ${entry.speaker === 'Doctor' ? '' : 'flex-row-reverse'}`}>
                             <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center border ${entry.speaker === 'Doctor' ? 'bg-aivana-accent/20 border-aivana-accent/30 text-aivana-accent' : 'bg-blue-600/20 border-blue-500/30 text-blue-400'}`}>
                                 <Icon name={entry.speaker === 'Doctor' ? 'ai' : 'user'} className="w-5 h-5" />
