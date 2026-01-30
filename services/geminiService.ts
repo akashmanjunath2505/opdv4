@@ -135,8 +135,8 @@ export const generateSoapNote = async (
     2. SUBJECTIVE: List patient symptoms in short bullet points.
     3. OBJECTIVE: List physical findings or observations if any.
     4. LAB RESULTS: List any lab test values, vital signs (BP, PR, SpO2, Temp), or investigation reports mentioned.
-    5. ASSESSMENT: List the primary or most likely diagnosis.
-    6. DIFFERENTIAL DIAGNOSIS: List other potential diagnoses that are being considered, if any.
+    5. ASSESSMENT: Leave this section empty.
+    6. DIFFERENTIAL DIAGNOSIS: List the Primary Diagnosis first, followed by other potential diagnoses that are being considered.
     7. DO NOT include a "Plan" or "Prescription" section here.
     8. NO markdown formatting within sections (bold/italics).
   `;
@@ -228,8 +228,8 @@ export const generateClinicalNote = async (
     1. **Cleanup First**: Internally clean the transcript to remove fillers and correct medical terms before extraction.
     2. **Subjective**: Summarize patient's complaints/symptoms.
     3. **Objective**: Summarize physical findings.
-    4. **Assessment**: Primary diagnosis.
-    5. **Differential Diagnosis**: Other potential diagnoses considered.
+    4. **Assessment**: Leave as empty string "".
+    5. **Differential Diagnosis**: Primary Diagnosis followed by other potential diagnoses considered.
     6. **Lab Results**: Any tests, vitals, or investigations mentioned.
     7. **Advice**: Diet, lifestyle, follow-up instructions (excluding medicines).
     
@@ -382,8 +382,8 @@ export const processVoiceEdit = async (
     
     RULES:
     1. Update the JSON based strictly on the command.
-    2. If the command asks to "add" a symptom or diagnosis, append it to the existing text or list.
-    3. If the command asks to "change" or "update" a specific value, replace that value.
+    2. If the command asks to "add" a symptom, append to 'subjective'. If "diagnosis", append to 'differentialDiagnosis' (do NOT use 'assessment').
+    3. If the command asks to "change" or "update" a specific value, replace that value. For diagnosis, update 'differentialDiagnosis'.
     4. For medicines, if a new medicine is mentioned, add it to the list using the Name|Dosage|Frequency|Route structure.
     5. If a medicine is being updated (e.g., "change Metformin dose"), find the entry and update only that field.
     6. Maintain the original language or script (${language}) unless specified otherwise.

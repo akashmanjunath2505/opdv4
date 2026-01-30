@@ -111,20 +111,13 @@ const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptio
                 </div>
             </div>
 
-            {/* Diagnosis (Full Width) */}
-            <div className="bg-[#FFF0F0] border-l border-r border-t border-gray-300 p-2">
-                <div className={`${baseFontSize} font-bold uppercase tracking-tighter`}>Diagnosis</div>
-            </div>
-            <div className={`border border-gray-300 mb-5 p-4 ${baseFontSize} whitespace-pre-wrap min-h-[60px] font-normal leading-relaxed`}>
-                {prescriptionData.assessment}
-            </div>
 
             {/* Differential Diagnosis (Full Width) */}
             <div className="bg-[#FFF0F0] border-l border-r border-t border-gray-300 p-2">
                 <div className={`${baseFontSize} font-bold uppercase tracking-tighter`}>Differential Diagnosis</div>
             </div>
             <div className={`border border-gray-300 mb-5 p-4 ${baseFontSize} whitespace-pre-wrap min-h-[60px] font-normal leading-relaxed`}>
-                {prescriptionData.differentialDiagnosis || "None identified."}
+                {[prescriptionData.assessment, prescriptionData.differentialDiagnosis].filter(Boolean).join('\n') || "None identified."}
             </div>
 
             {/* Lab Test Results (Full Width) */}
@@ -584,16 +577,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                         />
                                     </div>
 
-                                    {/* Diagnosis */}
-                                    <div>
-                                        <label className="text-[9px] uppercase font-bold text-gray-500 mb-2 block">Diagnosis</label>
-                                        <textarea
-                                            value={prescriptionData.assessment}
-                                            onChange={(e) => setPrescriptionData({ ...prescriptionData, assessment: e.target.value })}
-                                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-xs text-white outline-none focus:border-aivana-accent transition-colors resize-none min-h-[60px]"
-                                            placeholder="Enter diagnosis..."
-                                        />
-                                    </div>
 
                                     {/* Differential Diagnosis */}
                                     <div>
