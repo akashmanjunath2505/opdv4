@@ -13,8 +13,11 @@ import { PrintViewModal } from './components/PrintViewModal';
 import { AboutModal } from './components/AboutModal';
 import { generateCaseSummary } from './services/geminiService';
 import { CaseSummaryModal } from './components/CaseSummaryModal';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { UsageLimitBanner } from './components/UsageLimitBanner';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { user, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const userRole = UserRole.DOCTOR;
   const [language, setLanguage] = useState('English');
@@ -204,15 +207,18 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col bg-aivana-dark relative">
         {renderActiveView()}
       </main>
+      {/* Modals */}
       <LicenseVerificationModal
         isOpen={showVerificationModal}
         onClose={() => setShowVerificationModal(false)}
-        onVerify={handleVerifyLicense}
+        onVerified={handleDoctorVerified}
+        pendingMessage={pendingVerificationMessage}
       />
       <PrintViewModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
-        protocols={knowledgeBaseProtocols}
+        chat={activeChat}
+        doctorProfile={doctorProfile}
       />
       <AboutModal
         isOpen={isAboutModalOpen}
@@ -221,11 +227,19 @@ const App: React.FC = () => {
       <CaseSummaryModal
         isOpen={isSummaryModalOpen}
         onClose={() => setIsSummaryModalOpen(false)}
-        summaryContent={summaryContent}
+        content={summaryContent}
         isGenerating={isGeneratingSummary}
         chatTitle={activeChat?.title || "Case Summary"}
       />
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 
