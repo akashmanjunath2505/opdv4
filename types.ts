@@ -2,20 +2,26 @@
 import type { ReactElement } from 'react';
 
 export interface Medicine {
-    name: string;
-    dosage: string;
-    frequency: string;
-    route: string;
+  name: string;
+  dosage: string;
+  frequency: string;
+  route: string;
 }
 
 export interface PrescriptionData {
-    subjective: string;
-    objective: string;
-    assessment: string;
-    differentialDiagnosis: string;
-    labResults: string;
-    medicines: Medicine[];
-    advice: string;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  differentialDiagnosis: string;
+  labResults: string;
+  medicines: Medicine[];
+
+  advice: string;
+}
+
+export interface PatientDemographics {
+  name: string; age: string; sex: string; mobile: string; weight: string; height: string; bmi: string;
+  date: string; hospitalName: string; hospitalAddress: string; hospitalPhone: string;
 }
 
 export enum UserRole {
@@ -30,8 +36,8 @@ export interface Citation {
 }
 
 export interface DoctorProfile {
-    qualification: 'MBBS' | 'BAMS' | 'BHMS';
-    canPrescribeAllopathic: 'yes' | 'limited' | 'no';
+  qualification: 'MBBS' | 'BAMS' | 'BHMS';
+  canPrescribeAllopathic: 'yes' | 'limited' | 'no';
 }
 
 // Types for Structured AI Responses
@@ -78,21 +84,21 @@ export interface PatientHandout {
 }
 
 export interface RiskAssessmentResult {
-    riskLevel: 'Low' | 'Medium' | 'High';
-    riskFactors: string[];
-    recommendations: string[];
-    summary: string;
+  riskLevel: 'Low' | 'Medium' | 'High';
+  riskFactors: string[];
+  recommendations: string[];
+  summary: string;
 }
 
 export type LabParameterInput = {
-    name: string;
-    value: string;
-    units: string;
-    referenceRange: string;
+  name: string;
+  value: string;
+  units: string;
+  referenceRange: string;
 };
 
 
-export type StructuredDataType = 
+export type StructuredDataType =
   | { type: 'ddx'; data: DdxItem[]; summary: string; questions?: string[] }
   | { type: 'lab'; data: LabResultAnalysis; summary: string }
   | { type: 'billing'; data: MedicalCodeResult; summary: string }
@@ -115,7 +121,7 @@ export interface Message {
 }
 
 export interface Chat {
-  id:string;
+  id: string;
   title: string;
   messages: Message[];
   userRole: UserRole;
@@ -135,21 +141,21 @@ export interface PreCodedGpt {
 export type ScribeInsightCategory = 'Differential Diagnosis' | 'Questions to Ask' | 'Labs to Consider' | 'General Note';
 
 export interface ScribeInsightBlock {
-    category: ScribeInsightCategory;
-    points: string[];
+  category: ScribeInsightCategory;
+  points: string[];
 }
 
 export interface TranscriptEntry {
-    id: string;
-    speaker: 'Doctor' | 'Patient' | 'AI';
-    text: string;
-    segmentIndex?: number;
+  id: string;
+  speaker: 'Doctor' | 'Patient' | 'AI';
+  text: string;
+  segmentIndex?: number;
 }
 
 export interface PromptInsight {
-    keyTerms: string[];
-    suggestions: string[];
-    followUps: string[];
+  keyTerms: string[];
+  suggestions: string[];
+  followUps: string[];
 }
 
 // --- Clinical Knowledge Base Schema ---
@@ -204,15 +210,15 @@ export interface EscalationTrigger {
 }
 
 export interface MonitoringParameter {
-    parameter: string;
-    frequency: string;
-    normal_range?: string;
+  parameter: string;
+  frequency: string;
+  normal_range?: string;
 }
 
 export interface MonitoringTemplate {
-    title: string;
-    parameters: MonitoringParameter[];
-    alert_triggers: { condition: string, action: string }[];
+  title: string;
+  parameters: MonitoringParameter[];
+  alert_triggers: { condition: string, action: string }[];
 }
 
 

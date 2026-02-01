@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { DoctorProfile, TranscriptEntry, PrescriptionData } from '../types';
+import { DoctorProfile, TranscriptEntry, PrescriptionData, PatientDemographics } from '../types';
 import { Icon } from './Icon';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -8,6 +8,7 @@ import { useLiveScribe } from '../hooks/useLiveScribe';
 import { useVoiceEdit } from '../hooks/useVoiceEdit';
 import { processAudioSegment, generateClinicalNote } from '../services/geminiService';
 import { renderMarkdownToHTML } from '../utils/markdownRenderer';
+import { convertToFhir, downloadData, exportToJson, sendToEmr } from '../services/integrationService';
 
 interface ScribeSessionViewProps {
     onEndSession: () => void;
@@ -15,10 +16,7 @@ interface ScribeSessionViewProps {
     language: string;
 }
 
-interface PatientDemographics {
-    name: string; age: string; sex: string; mobile: string; weight: string; height: string; bmi: string;
-    date: string; hospitalName: string; hospitalAddress: string; hospitalPhone: string;
-}
+// interface PatientDemographics imported from types
 
 
 
@@ -522,7 +520,43 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
                     <div className="p-6 border-b border-white/5 bg-black/40 flex flex-col gap-4">
                         {clinicalNote && (
-                            <button onClick={handleDownloadPDF} className="w-full py-3.5 bg-aivana-accent text-white rounded-xl font-bold text-[11px] uppercase tracking-widest shadow-lg shadow-aivana-accent/30 hover:bg-purple-600 transition-all">Export Prescription</button>
+                            <div className="space-y-3">
+                                <button onClick={handleDownloadPDF} className="w-full py-3.5 bg-aivana-accent text-white rounded-xl font-bold text-[11px] uppercase tracking-widest shadow-lg shadow-aivana-accent/30 hover:bg-purple-600 transition-all">Print / PDF</button>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => {
+                                            const fhirBundle = convertToFhir(prescriptionData, doctorProfile, patient);
+                                            downloadData(fhirBundle, 'fhir', `prescription-${Date.now()}.json`);
+                                        }}
+                                        className="py-3 bg-white/5 text-gray-300 border border-white/10 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
+                                    >
+                                        Export FHIR
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const jsonData = exportToJson(prescriptionData);
+                                            downloadData(JSON.parse(jsonData), 'json', `prescription-${Date.now()}.json`);
+                                        }}
+                                        className="py-3 bg-white/5 text-gray-300 border border-white/10 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
+                                    >
+                                        Export JSON
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const fhirBundle = convertToFhir(prescriptionData, doctorProfile, patient);
+                                            await sendToEmr(fhirBundle);
+                                            alert("Successfully synced with EMR!");
+                                        } catch (e) {
+                                            alert("Failed to sync. Ensure Mock EMR Server is running on port 3001.");
+                                        }
+                                    }}
+                                    className="w-full py-3 bg-green-500/10 text-green-400 border border-green-500/20 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-green-500/20 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Icon name="check" className="w-3.5 h-3.5" /> Sync to EMR
+                                </button>
+                            </div>
                         )}
                     </div>
 

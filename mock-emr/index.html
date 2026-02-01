@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nimbus EMR - Hospital Management System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --sidebar-width: 260px;
+            --header-height: 64px;
+            --bg-light: #f3f4f6;
+            --border: #e5e7eb;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-light);
+            color: #111827;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #fff;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .logo-area {
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo-icon {
+            color: var(--primary);
+            font-size: 24px;
+            margin-right: 12px;
+        }
+
+        .logo-text {
+            font-weight: 700;
+            font-size: 20px;
+            color: #1f2937;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-menu {
+            padding: 24px 16px;
+            flex: 1;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            color: var(--secondary);
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: all 0.2s;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: #eff6ff;
+            color: var(--primary);
+        }
+
+        .nav-item.active {
+            background: #eff6ff;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .nav-item i {
+            width: 24px;
+            margin-right: 12px;
+        }
+
+        .user-profile {
+            padding: 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            background: #bfdbfe;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .user-info h4 {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .user-info p {
+            font-size: 12px;
+            color: var(--secondary);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            height: var(--header-height);
+            background: #fff;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+        }
+
+        .search-bar {
+            width: 400px;
+            height: 40px;
+            background: var(--bg-light);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            color: var(--secondary);
+        }
+
+        .search-bar input {
+            border: none;
+            background: transparent;
+            margin-left: 8px;
+            outline: none;
+            flex: 1;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .icon-btn {
+            position: relative;
+            cursor: pointer;
+            color: var(--secondary);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #ef4444;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: none;
+        }
+
+        /* Views */
+        .view-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+            display: none;
+        }
+
+        .view-container.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        /* Dashboard Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--secondary);
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .stat-trend {
+            font-size: 12px;
+            color: #10b981;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-trend.down {
+            color: #ef4444;
+        }
+
+        /* Appointment Table */
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 16px 24px;
+            background: #f9fafb;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--secondary);
+        }
+
+        td {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        td strong {
+            font-weight: 600;
+            color: #111827;
+            display: block;
+        }
+
+        td span {
+            color: var(--secondary);
+            font-size: 13px;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.waiting {
+            background: #fff7ed;
+            color: #c2410c;
+        }
+
+        .status-badge.in-progress {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .status-badge.completed {
+            background: #f0fdf4;
+            color: #15803d;
+        }
+
+        /* Integration/Import Area */
+        .import-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .upload-box {
+            border: 2px dashed #93c5fd;
+            background: #eff6ff;
+            border-radius: 16px;
+            padding: 48px;
+            text-align: center;
+            margin-bottom: 32px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-box:hover {
+            border-color: var(--primary);
+            transform: scale(1.01);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: var(--primary);
+            margin-bottom: 16px;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .upload-sub {
+            color: var(--secondary);
+            font-size: 14px;
+        }
+
+        /* PDF / Details View */
+        .pdf-view {
+            width: 100%;
+            background: white;
+            padding: 40px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            font-family: Arial, sans-serif;
+            color: black;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo-area">
+            <i class="fas fa-cloud-medical logo-icon"></i>
+            <span class="logo-text">Nimbus EMR</span>
+        </div>
+        <nav class="nav-menu">
+            <div class="nav-item active" onclick="switchView('dashboard', this)">
+                <i class="fas fa-chart-line"></i> Dashboard
+            </div>
+            <div class="nav-item" onclick="switchView('patients', this)">
+                <i class="fas fa-user-injured"></i> Patients
+            </div>
+            <div class="nav-item" onclick="switchView('import', this)">
+                <i class="fas fa-file-import"></i> External Import
+            </div>
+        </nav>
+        <div class="user-profile">
+            <div class="avatar">DA</div>
+            <div class="user-info">
+                <h4>Dr. Akash</h4>
+                <p>Cardiologist</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search patients, files, or records...">
+            </div>
+            <div class="header-actions">
+                <div class="icon-btn"><i class="far fa-bell"></i>
+                    <div class="notification-badge"></div>
+                </div>
+                <div style="width: 1px; height: 24px; background: var(--border);"></div>
+                <button onclick="switchView('import')"
+                    style="background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 500; cursor: pointer;">
+                    <i class="fas fa-plus"></i> New Note
+                </button>
+            </div>
+        </header>
+
+        <!-- View: Dashboard -->
+        <div id="dashboard" class="view-container active">
+            <div class="page-header">
+                <h1 class="page-title">Dashboard Overview</h1>
+                <div style="font-size: 14px; color: var(--secondary);">Last updated: Just now</div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Total Patients</span>
+                    <span class="stat-value">1,284</span>
+                    <span class="stat-trend"><i class="fas fa-arrow-up"></i> +12% this month</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Appointments Today</span>
+                    <span class="stat-value">42</span>
+                    <span class="stat-trend"><i class="fas fa-arrow-up"></i> 8 pending</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Avg. Wait Time</span>
+                    <span class="stat-value">14m</span>
+                    <span class="stat-trend down"><i class="fas fa-arrow-down"></i> -2m from last week</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Revenue</span>
+                    <span class="stat-value">$12.4k</span>
+                    <span class="stat-trend"><i class="fas fa-arrow-up"></i> +5%</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Today's Appointments</div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Patient Name</th>
+                            <th>Time</th>
+                            <th>Doctor</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Sarah Johnson</strong><span>ID: #99281</span></td>
+                            <td>09:30 AM</td>
+                            <td>Dr. Akash</td>
+                            <td>Consultation</td>
+                            <td><span class="status-badge completed">Completed</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Michael Chen</strong><span>ID: #55123</span></td>
+                            <td>10:15 AM</td>
+                            <td>Dr. Akash</td>
+                            <td>Follow-up</td>
+                            <td><span class="status-badge in-progress">In Session</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- View: Patients Table -->
+        <div id="patients" class="view-container">
+            <div class="page-header">
+                <h1 class="page-title">Patient Directory</h1>
+                <button onclick="fetchPatients()"
+                    style="background: white; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer;">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Patient Name</th>
+                            <th>Diagnosis / Complaint</th>
+                            <th>Age / Sex</th>
+                            <th>Visit Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="patient-list-body">
+                        <!-- Dynamic Content -->
+                        <tr>
+                            <td colspan="5" style="text-align:center; color: var(--secondary);">Loading patients...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- View: Import / Note (Details) -->
+        <div id="import" class="view-container">
+            <div class="page-header">
+                <h1 class="page-title">Clinical Record View</h1>
+            </div>
+
+            <div class="import-container" id="uploadStep">
+                <div class="upload-box" id="dropZone">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <div class="upload-text">Import Veda/FHIR Bundle</div>
+                    <div class="upload-sub">Waiting for Webhook data...</div>
+                    <input type="file" id="fileInput" style="display: none" accept=".json">
+                </div>
+            </div>
+
+            <div id="noteResult" class="hidden">
+                <div
+                    style="margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; background: #dcfce7; color: #166534; padding: 12px 24px; border-radius: 8px; font-weight: 500;">
+                    <div><i class="fas fa-check-circle"></i> Clinical Record Loaded</div>
+                    <button onclick="switchView('patients')"
+                        style="padding: 4px 12px; background: white; border: 1px solid #bbf7d0; border-radius: 4px; cursor: pointer; font-size: 12px;">Back
+                        to List</button>
+                </div>
+
+                <div id="pdf-output"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Basic Routing
+        function switchView(viewName, menuItem) {
+            if (menuItem) {
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                menuItem.classList.add('active');
+            } else {
+                const item = document.querySelector(`.nav-item[onclick*="'${viewName}'"]`);
+                if (item) {
+                    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                    item.classList.add('active');
+                }
+            }
+            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewName).classList.add('active');
+        }
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#2563eb'; dropZone.style.background = '#dbeafe'; });
+        dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#93c5fd'; dropZone.style.background = '#eff6ff'; });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    renderImport(data);
+                } catch (err) { alert("Failed to parse JSON."); }
+            };
+            reader.readAsText(file);
+        }
+
+        function renderImport(data) {
+            document.getElementById('uploadStep').classList.add('hidden');
+            document.getElementById('noteResult').classList.remove('hidden');
+
+            let s = "", o = "", a = "", p = "", advice = "";
+            let meds = [];
+            let patientName = "Unknown";
+            let patientAge = "--";
+            let patientSex = "--";
+            let patientMobile = "--";
+
+            // FHIR Parsing
+            if (data.resourceType === 'Bundle') {
+                const composition = data.entry.find(e => e.resource.resourceType === 'Composition');
+                const patientRes = data.entry.find(e => e.resource.resourceType === 'Patient')?.resource;
+
+                if (patientRes) {
+                    patientName = patientRes.name?.[0]?.text || "Unknown";
+                    patientMobile = patientRes.telecom?.[0]?.value || "--";
+                    patientRes.extension?.forEach(ext => {
+                        if (ext.url.includes("age")) patientAge = ext.valueString;
+                    });
+                    patientSex = patientRes.gender || "--";
+                } else if (composition?.resource?.subject?.display) {
+                    patientName = composition.resource.subject.display;
+                }
+
+                const findSection = (titleStart) => {
+                    const sec = composition?.resource?.section?.find(s => s.title.toLowerCase().startsWith(titleStart.toLowerCase()));
+                    return sec?.text?.div?.replace(/<[^>]*>/g, '') || "";
+                };
+
+                s = findSection('Subjective');
+                o = findSection('Objective');
+                a = findSection('Assessment') || findSection('Differential');
+
+                const planSec = composition?.resource?.section?.find(s => s.title.toLowerCase().startsWith('plan'));
+                advice = planSec?.text?.div?.replace(/<[^>]*>/g, '') || "";
+
+                data.entry.filter(e => e.resource.resourceType === 'MedicationRequest').forEach(entry => {
+                    const r = entry.resource;
+                    const dosage = r.dosageInstruction?.[0];
+                    meds.push({
+                        name: r.medicationCodeableConcept?.text || "Unknown Drug",
+                        dosage: dosage?.text || "",
+                        frequency: dosage?.timing?.code?.text || "",
+                        route: dosage?.route?.text || ""
+                    });
+                });
+            }
+
+            // Generate Table View
+            const recordHtml = `
+                <div class="card" style="padding: 0; overflow: hidden; max-width: 900px; margin: 0 auto; margin-top: 24px;">
+                    <div style="padding: 24px; background: white; border-bottom: 1px solid var(--border);">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h2 style="font-size: 20px; font-weight: bold; color: #111827;">Clinical Record Details</h2>
+                            <div style="font-size: 12px; color: var(--secondary);">Received: ${new Date().toLocaleString()}</div>
+                        </div>
+                    </div>
+                    
+                    <div style="padding: 24px;">
+                        <!-- Patient Info Table -->
+                        <h3 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 12px; text-transform: uppercase;">Patient Information</h3>
+                        <table style="width: 100%; border: 1px solid var(--border); margin-bottom: 24px;">
+                            <tr style="background: #f9fafb;">
+                                <td style="width: 25%; font-weight: 600; color: var(--secondary);">Patient Name</td>
+                                <td style="width: 25%;">${patientName}</td>
+                                <td style="width: 25%; font-weight: 600; color: var(--secondary);">Age / Sex</td>
+                                <td style="width: 25%;">${patientAge} / ${patientSex}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 600; color: var(--secondary);">Given Date</td>
+                                <td>${new Date().toLocaleDateString()}</td>
+                                <td style="font-weight: 600; color: var(--secondary);">Mobile</td>
+                                <td>${patientMobile}</td>
+                            </tr>
+                        </table>
+
+                        <!-- Clinical Data Table -->
+                        <h3 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 12px; text-transform: uppercase;">Clinical Assessment</h3>
+                        <table style="width: 100%; border: 1px solid var(--border); margin-bottom: 24px;">
+                            <tr style="background: #f9fafb;"><td style="font-weight: 600; color: var(--secondary);">Chief Complaint</td></tr>
+                            <tr><td style="padding: 12px; white-space: pre-wrap;">${s || "N/A"}</td></tr>
+                            
+                            <tr style="background: #f9fafb;"><td style="font-weight: 600; color: var(--secondary);">Clinical Findings</td></tr>
+                            <tr><td style="padding: 12px; white-space: pre-wrap;">${o || "N/A"}</td></tr>
+
+                            <tr style="background: #f9fafb;"><td style="font-weight: 600; color: var(--secondary);">Diagnosis</td></tr>
+                            <tr><td style="padding: 12px; white-space: pre-wrap;">${a || "N/A"}</td></tr>
+                        </table>
+
+                        <!-- Medications -->
+                        <h3 style="font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 12px; text-transform: uppercase;">Prescribed Medications</h3>
+                        <table style="width: 100%; border: 1px solid var(--border); margin-bottom: 24px;">
+                            <thead>
+                                <tr style="background: #f9fafb;">
+                                    <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--secondary);">Medicine Name</th>
+                                    <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--secondary);">Dosage</th>
+                                    <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--secondary);">Frequency</th>
+                                    <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--secondary);">Route</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${meds.length > 0 ? meds.map(m => `
+                                <tr>
+                                    <td style="padding: 12px; border-bottom: 1px solid var(--border);"><strong>${m.name}</strong></td>
+                                    <td style="padding: 12px; border-bottom: 1px solid var(--border);">${m.dosage}</td>
+                                    <td style="padding: 12px; border-bottom: 1px solid var(--border);">${m.frequency}</td>
+                                    <td style="padding: 12px; border-bottom: 1px solid var(--border);">${m.route}</td>
+                                </tr>`).join('') : '<tr><td colspan="4" style="padding: 12px; text-align: center;">No medicines prescribed.</td></tr>'}
+                            </tbody>
+                        </table>
+
+                        <!-- Advice -->
+                        <div style="background: #fff7ed; border: 1px solid #fed7aa; padding: 16px; border-radius: 8px;">
+                            <strong style="color: #c2410c; display: block; margin-bottom: 8px; text-transform: uppercase; font-size: 12px;">Advice / Instructions</strong>
+                            <p style="white-space: pre-wrap; font-size: 14px;">${advice || "N/A"}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('pdf-output').innerHTML = recordHtml;
+        }
+
+        // Fetch and Render Patients
+        function fetchPatients() {
+            fetch('http://localhost:3001/api/patients')
+                .then(r => r.json())
+                .then(patients => {
+                    renderPatientTable(patients);
+                })
+                .catch(err => console.error("Failed to fetch patients", err));
+        }
+
+        function renderPatientTable(patients) {
+            const tbody = document.getElementById('patient-list-body');
+            if (!tbody) return;
+
+            if (patients.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 24px;">No patients found. Sync a note from Veda.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = patients.map(p => {
+                const name = getPatientName(p);
+                const info = getPatientInfo(p);
+                const diagnosis = getDiagnosis(p);
+                const date = new Date(p._receivedAt).toLocaleDateString();
+                const time = new Date(p._receivedAt).toLocaleTimeString();
+
+                return `
+                    <tr>
+                        <td><strong>${name}</strong><span>ID: #${p.id.substring(p.id.length - 5)}</span></td>
+                        <td>${diagnosis}</td>
+                        <td>${info.age} / ${info.sex}</td>
+                        <td>${date} <span style="font-size:10px">${time}</span></td>
+                        <td>
+                            <button onclick="viewPatient('${p.id}')" style="color: var(--primary); background: #eff6ff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">View Record</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getPatientName(data) {
+            if (data.resourceType === 'Bundle') {
+                const patientRes = data.entry.find(e => e.resource.resourceType === 'Patient')?.resource;
+                if (patientRes && patientRes.name) return patientRes.name[0].text;
+            }
+            return "Unknown Patient";
+        }
+
+        function getPatientInfo(data) {
+            let age = "--", sex = "--";
+            if (data.resourceType === 'Bundle') {
+                const patientRes = data.entry.find(e => e.resource.resourceType === 'Patient')?.resource;
+                if (patientRes) {
+                    sex = patientRes.gender || "--";
+                    patientRes.extension?.forEach(ext => {
+                        if (ext.url.includes("age")) age = ext.valueString;
+                    });
+                }
+            }
+            return { age, sex };
+        }
+
+        function getDiagnosis(data) {
+            if (data.resourceType === 'Bundle') {
+                const composition = data.entry.find(e => e.resource.resourceType === 'Composition');
+                const findSection = (titleStart) => {
+                    const sec = composition?.resource?.section?.find(s => s.title.toLowerCase().startsWith(titleStart.toLowerCase()));
+                    return sec?.text?.div?.replace(/<[^>]*>/g, '').substring(0, 50) + (sec?.text?.div?.length > 50 ? "..." : "") || "";
+                };
+                let diag = findSection('Differential - Diagnosis');
+                if (!diag) diag = findSection('Assessment');
+                if (!diag) diag = findSection('Subjective');
+                return diag || "<span style='color:#9ca3af'>--</span>";
+            }
+            return "--";
+        }
+
+        function viewPatient(id) {
+            fetch(`http://localhost:3001/api/patients/${id}`)
+                .then(r => r.json())
+                .then(data => {
+                    switchView('import');
+                    renderImport(data);
+                })
+                .catch(err => alert("Could not fetch patient details"));
+        }
+
+        // Auto-Poll
+        let lastReceivedTime = null;
+        setInterval(() => {
+            fetch('http://localhost:3001/api/latest-data')
+                .then(r => r.json())
+                .then(data => {
+                    fetchPatients(); // Refresh list
+                    if (data && data._receivedAt !== lastReceivedTime) {
+                        lastReceivedTime = data._receivedAt;
+                        document.querySelector('.notification-badge').style.display = 'block';
+                    }
+                })
+                .catch(err => console.log("Polling..."));
+        }, 2000);
+
+        // Initial
+        fetchPatients();
+    </script>
+</body>
+
+</html>
