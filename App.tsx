@@ -21,6 +21,18 @@ const AppContent: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const userRole = UserRole.DOCTOR;
   const [language, setLanguage] = useState('English');
+
+  // Show loading screen while auth is initializing
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-aivana-dark">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-aivana-accent mx-auto mb-4"></div>
+          <p className="text-aivana-text-secondary">Loading...</p>
+        </div>
+      </div>
+    );
+  }
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
