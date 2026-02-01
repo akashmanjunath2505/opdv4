@@ -204,11 +204,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const { isRecording, startRecording, stopRecording } = useAudioRecorder();
     const { startListening, stopListening, interimTranscript, transcript, resetTranscript } = useSpeechRecognition({ lang: sessionLanguage });
 
-    // Live Transcription State
-    const [liveTranscriptSegments, setLiveTranscriptSegments] = useState<TranscriptEntry[]>([]);
-    const lastProcessedTranscriptLengthRef = useRef(0);
-
-
     // Background Generation Hook
     const { liveNote, isGenerating: isGeneratingBackground } = useLiveScribe(
         transcriptHistory,
@@ -241,23 +236,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     useEffect(() => {
         transcriptHistoryRef.current = transcriptHistory;
     }, [transcriptHistory]);
-
-    // Handle Live Transcript Accumulation
-    useEffect(() => {
-        if (phase === 'active' && transcript.length > lastProcessedTranscriptLengthRef.current) {
-            const newText = transcript.slice(lastProcessedTranscriptLengthRef.current).trim();
-            if (newText) {
-                const newEntry: TranscriptEntry = {
-                    id: `live-${Date.now()}-${Math.random()}`,
-                    speaker: 'Doctor', // Default for live view
-                    text: newText,
-                    segmentIndex: -1
-                };
-                setLiveTranscriptSegments(prev => [...prev, newEntry]);
-            }
-            lastProcessedTranscriptLengthRef.current = transcript.length;
-        }
-    }, [transcript, phase]);
 
 
     const formatTime = (seconds: number) => {
@@ -307,8 +285,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         setDuration(0);
         setTranscriptHistory([]);
         transcriptHistoryRef.current = [];
-        setLiveTranscriptSegments([]);
-        lastProcessedTranscriptLengthRef.current = 0;
         resetTranscript();
         setClinicalNote('');
         processedSegmentsRef.current = 0;
@@ -473,7 +449,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 )}
 
                 <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-black/10">
-                    {phase === 'active' && liveTranscriptSegments.length === 0 && !interimTranscript && (
+                    {phase === 'active' && transcriptHistory.length === 0 && !interimTranscript && (
                         <div className="h-full flex flex-col items-center justify-center opacity-10">
                             <Icon name="microphone" className="w-16 h-16 mb-4" />
                             <p className="text-[10px] font-black uppercase tracking-[0.4em]">Listening for dialogue...</p>
@@ -485,7 +461,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                             <p className="text-[10px] font-black uppercase tracking-[0.4em]">Listening for dialogue...</p>
                         </div>
                     )}
-                    {(phase === 'active' ? liveTranscriptSegments : transcriptHistory).map(entry => (
+                    {transcriptHistory.map(entry => (
 
                         <div key={entry.id} className={`flex gap-6 animate-fadeInUp ${entry.speaker === 'Doctor' ? '' : 'flex-row-reverse'}`}>
                             <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center border ${entry.speaker === 'Doctor' ? 'bg-aivana-accent/20 border-aivana-accent/30 text-aivana-accent' : 'bg-blue-600/20 border-blue-500/30 text-blue-400'}`}>
@@ -522,40 +498,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         {clinicalNote && (
                             <div className="space-y-3">
                                 <button onClick={handleDownloadPDF} className="w-full py-3.5 bg-aivana-accent text-white rounded-xl font-bold text-[11px] uppercase tracking-widest shadow-lg shadow-aivana-accent/30 hover:bg-purple-600 transition-all">Print / PDF</button>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => {
-                                            const fhirBundle = convertToFhir(prescriptionData, doctorProfile, patient);
-                                            downloadData(fhirBundle, 'fhir', `prescription-${Date.now()}.json`);
-                                        }}
-                                        className="py-3 bg-white/5 text-gray-300 border border-white/10 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
-                                    >
-                                        Export FHIR
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            const jsonData = exportToJson(prescriptionData);
-                                            downloadData(JSON.parse(jsonData), 'json', `prescription-${Date.now()}.json`);
-                                        }}
-                                        className="py-3 bg-white/5 text-gray-300 border border-white/10 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
-                                    >
-                                        Export JSON
-                                    </button>
-                                </div>
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            const fhirBundle = convertToFhir(prescriptionData, doctorProfile, patient);
-                                            await sendToEmr(fhirBundle);
-                                            alert("Successfully synced with EMR!");
-                                        } catch (e) {
-                                            alert("Failed to sync. Ensure Mock EMR Server is running on port 3001.");
-                                        }
-                                    }}
-                                    className="w-full py-3 bg-green-500/10 text-green-400 border border-green-500/20 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-green-500/20 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Icon name="check" className="w-3.5 h-3.5" /> Sync to EMR
-                                </button>
                             </div>
                         )}
                     </div>

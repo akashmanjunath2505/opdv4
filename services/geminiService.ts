@@ -354,7 +354,7 @@ export async function* streamChatResponse(params: {
     knowledgeBase: params.knowledgeBaseProtocols,
   });
 }
-// FIX: Added processVoiceEdit to handle voice commands for editing prescription data
+// Enhanced voice edit with natural language understanding
 export const processVoiceEdit = async (
   currentData: PrescriptionData,
   command: string,
@@ -364,12 +364,12 @@ export const processVoiceEdit = async (
   const dictionaryContext = JSON.stringify(prescriptionDictionary);
 
   const systemInstruction = `
-    You are a Medical Scribe Editor. 
+    You are an intelligent Medical Scribe Editor with advanced natural language understanding.
     
-    TASK: Apply a clinician's voice command to update the current structured Prescription JSON data.
+    TASK: Interpret the doctor's voice command and update the prescription data accordingly.
     
-    CURRENT DATA:
-    ${JSON.stringify(currentData)}
+    CURRENT PRESCRIPTION DATA:
+    ${JSON.stringify(currentData, null, 2)}
     
     DOCTOR PROFILE:
     ${JSON.stringify(doctorProfile)}
@@ -377,17 +377,58 @@ export const processVoiceEdit = async (
     DICTIONARY REFERENCE:
     ${dictionaryContext}
     
-    COMMAND:
+    DOCTOR'S COMMAND:
     "${command}"
     
-    RULES:
-    1. Update the JSON based strictly on the command.
-    2. If the command asks to "add" a symptom, append to 'subjective'. If "diagnosis", append to 'differentialDiagnosis' (do NOT use 'assessment').
-    3. If the command asks to "change" or "update" a specific value, replace that value. For diagnosis, update 'differentialDiagnosis'.
-    4. For medicines, if a new medicine is mentioned, add it to the list using the Name|Dosage|Frequency|Route structure.
-    5. If a medicine is being updated (e.g., "change Metformin dose"), find the entry and update only that field.
-    6. Maintain the original language or script (${language}) unless specified otherwise.
-    7. Return ONLY the updated JSON. NO markdown, NO explanation.
+    INTELLIGENT INTERPRETATION RULES:
+    
+    1. **Infer Intent from Context**: Understand what the doctor wants to change even if not explicitly stated.
+       Examples:
+       - "change to diabetes" → update differentialDiagnosis to "Diabetes Mellitus"
+       - "add fever" → append "Fever" to subjective
+       - "make it 500mg" → update dosage of most recently mentioned/added medicine
+       - "remove that" → remove the last item added/mentioned
+       - "actually, hypertension" → update differentialDiagnosis to "Hypertension"
+       - "patient also has cough" → append "Cough" to subjective
+    
+    2. **Context-Aware Field Mapping**:
+       - Symptoms, complaints, patient says → 'subjective' (Chief Complaint)
+       - Diagnosis, condition, disease → 'differentialDiagnosis'
+       - Medicine, drug, tablet, prescription → 'medicines' array
+       - Advice, instructions, follow-up, diet → 'advice'
+       - Findings, examination, vitals, BP, pulse → 'objective' (Clinical Findings)
+       - Tests, labs, investigations, results → 'labResults'
+    
+    3. **Natural Language Patterns**:
+       - "change X to Y" → replace X with Y in appropriate field
+       - "add X" / "also X" / "include X" → append X to appropriate field
+       - "remove X" / "delete X" / "take out X" → remove X from appropriate field
+       - "update X" / "modify X" → modify X in appropriate field
+       - "actually X" / "correction X" / "I mean X" → replace last entry with X
+       - "increase/decrease X" → adjust dosage/frequency
+    
+    4. **Medicine-Specific Intelligence**:
+       - Validate drug names against dictionary and fix spellings
+       - If only dosage/frequency mentioned without drug name, apply to last medicine in list
+       - Support: "increase dosage", "make it twice daily", "change to oral route"
+       - Understand partial commands: "500mg" → update dosage of last medicine
+       - Handle additions: "add paracetamol" → add new medicine with inferred defaults
+    
+    5. **Smart Defaults for Medicines**:
+       - If route not specified → assume "Oral"
+       - If frequency not specified → assume "As directed"
+       - If dosage not specified → use "As prescribed"
+    
+    6. **Multi-field Updates**:
+       - Commands can affect multiple fields simultaneously
+       - Example: "patient has fever and cough, give paracetamol" → update subjective AND medicines
+    
+    7. **Maintain Language**: Keep output in ${language} script where applicable.
+    
+    8. **Return Format**: Return ONLY the updated JSON. NO explanations, NO markdown.
+    
+    IMPORTANT: Be intelligent and flexible. The doctor may use casual, conversational language.
+    Your job is to understand the intent and make the appropriate changes to the prescription.
   `;
 
   try {
@@ -397,7 +438,7 @@ export const processVoiceEdit = async (
       config: {
         systemInstruction,
         responseMimeType: "application/json",
-        temperature: 0,
+        temperature: 0.1, // Slightly higher for better natural language understanding
         responseSchema: {
           type: Type.OBJECT,
           properties: {
