@@ -58,7 +58,7 @@ export const processAudioSegment = async (
     };
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       contents: { parts: [audioPart, { text: "Transcribe and normalize this clinical segment." }] },
       config: {
         systemInstruction,
@@ -109,7 +109,7 @@ export const cleanupTranscript = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       contents: `Raw Transcript:\n${transcript}`,
       config: { systemInstruction, temperature: 0 },
     });
@@ -143,7 +143,7 @@ export const generateSoapNote = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       contents: `Cleaned Transcript:\n${cleanedTranscript}`,
       config: { systemInstruction, temperature: 0 },
     });
@@ -188,7 +188,7 @@ export const generatePrescription = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       contents: `Cleaned Transcript:\n${cleanedTranscript}`,
       config: { systemInstruction, temperature: 0 },
     });
@@ -245,7 +245,7 @@ export const generateClinicalNote = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       contents: `Clinical Transcript:\n${transcript}`,
       config: {
         systemInstruction,
@@ -286,14 +286,14 @@ export const generateClinicalNote = async (
   }
 };
 
-// FIX: Implemented generateCaseSummary using gemini-2.0-flash-exp
+// FIX: Implemented generateCaseSummary using gemini-2.0-flash
 export const generateCaseSummary = async (messages: Message[], language: string, doctorProfile: DoctorProfile): Promise<string> => {
   const systemInstruction = `You are an expert clinical documentalist. Summarize the following doctor-patient conversation into a concise case summary for a medical record. Use ${language}.`;
   const transcript = messages.map(m => `${m.sender}: ${m.text}`).join('\n');
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       contents: transcript,
       config: { systemInstruction }
     });
@@ -310,7 +310,7 @@ export const getPromptInsights = async (prompt: string, doctorProfile: DoctorPro
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       contents: prompt,
       config: {
         systemInstruction,
@@ -392,7 +392,7 @@ export const processVoiceEdit = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       contents: `Apply this edit command: ${command}`,
       config: {
         systemInstruction,

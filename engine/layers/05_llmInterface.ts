@@ -8,12 +8,12 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Layer 05: Foundational LLM Interface (Reasoning Runtime)
 export const queryLlm = async (context: NexusContext): Promise<NexusContext> => {
-  
+
   const contents = constructLlmContent(context);
-  
+
   try {
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-2.0-flash-exp', // FIX: Using Gemini 3 for complex clinical reasoning
+      model: 'gemini-2.0-flash', // FIX: Using Gemini 2.0 Flash for complex clinical reasoning
       contents: contents,
       config: {
         systemInstruction: context.systemInstruction,
@@ -27,6 +27,6 @@ export const queryLlm = async (context: NexusContext): Promise<NexusContext> => 
     context.auditTrail.push(`[LLM Interface] ERROR: ${error.message}`);
     throw error;
   }
-  
+
   return context;
 };
