@@ -380,58 +380,84 @@ export const processVoiceEdit = async (
     DOCTOR'S COMMAND:
     "${command}"
     
+    CRITICAL FIELD MAPPING RULES:
+    
+    **FIELD IDENTIFICATION** - Pay close attention to these keywords:
+    
+    1. **subjective** (Chief Complaint) - Update when command mentions:
+       - "symptoms", "complaint", "complaining of", "patient says", "patient has"
+       - Examples: "add fever", "patient has headache", "complaining of pain"
+    
+    2. **objective** (Clinical Findings) - Update when command mentions:
+       - "clinical findings", "examination", "vitals", "BP", "pulse", "temperature"
+       - "on examination", "findings show", "observed", "physical exam"
+       - Examples: "edit clinical findings that patient was having some issue"
+                   "BP is 120/80", "on examination abdomen is soft"
+    
+    3. **differentialDiagnosis** - Update when command mentions:
+       - "diagnosis", "condition", "disease", "diagnosed with"
+       - Examples: "change diagnosis to diabetes", "diagnosed with hypertension"
+    
+    4. **labResults** - Update when command mentions:
+       - "lab", "test", "investigation", "results", "CBC", "blood test"
+       - Examples: "add CBC results", "HbA1c is 7.2"
+    
+    5. **medicines** - Update when command mentions:
+       - "medicine", "drug", "tablet", "prescription", "give", "prescribe"
+       - "dosage", "frequency", "route"
+       - Examples: "add paracetamol", "make it 500mg", "twice daily"
+    
+    6. **advice** - Update when command mentions:
+       - "advice", "instructions", "follow-up", "diet", "lifestyle"
+       - Examples: "advise bed rest", "follow up in 1 week"
+    
     INTELLIGENT INTERPRETATION RULES:
     
-    1. **Infer Intent from Context**: Understand what the doctor wants to change even if not explicitly stated.
-       Examples:
-       - "change to diabetes" → update differentialDiagnosis to "Diabetes Mellitus"
-       - "add fever" → append "Fever" to subjective
-       - "make it 500mg" → update dosage of most recently mentioned/added medicine
-       - "remove that" → remove the last item added/mentioned
-       - "actually, hypertension" → update differentialDiagnosis to "Hypertension"
-       - "patient also has cough" → append "Cough" to subjective
+    1. **Explicit Field Mentions**: If the command explicitly mentions a field name, update THAT field.
+       - "edit clinical findings X" → update 'objective' field
+       - "change chief complaint to X" → update 'subjective' field
+       - "update diagnosis to X" → update 'differentialDiagnosis' field
     
-    2. **Context-Aware Field Mapping**:
-       - Symptoms, complaints, patient says → 'subjective' (Chief Complaint)
-       - Diagnosis, condition, disease → 'differentialDiagnosis'
-       - Medicine, drug, tablet, prescription → 'medicines' array
-       - Advice, instructions, follow-up, diet → 'advice'
-       - Findings, examination, vitals, BP, pulse → 'objective' (Clinical Findings)
-       - Tests, labs, investigations, results → 'labResults'
+    2. **Infer from Context**: If no explicit field mentioned, infer from keywords:
+       - "patient has fever" → 'subjective' (symptom)
+       - "BP is 140/90" → 'objective' (vital sign/finding)
+       - "diabetes mellitus" → 'differentialDiagnosis' (condition)
     
     3. **Natural Language Patterns**:
        - "change X to Y" → replace X with Y in appropriate field
        - "add X" / "also X" / "include X" → append X to appropriate field
-       - "remove X" / "delete X" / "take out X" → remove X from appropriate field
-       - "update X" / "modify X" → modify X in appropriate field
-       - "actually X" / "correction X" / "I mean X" → replace last entry with X
-       - "increase/decrease X" → adjust dosage/frequency
+       - "remove X" / "delete X" → remove X from appropriate field
+       - "edit X that Y" → update field X with content Y
+       - "update X" → modify field X
     
     4. **Medicine-Specific Intelligence**:
-       - Validate drug names against dictionary and fix spellings
-       - If only dosage/frequency mentioned without drug name, apply to last medicine in list
-       - Support: "increase dosage", "make it twice daily", "change to oral route"
-       - Understand partial commands: "500mg" → update dosage of last medicine
-       - Handle additions: "add paracetamol" → add new medicine with inferred defaults
+       - Validate drug names against dictionary
+       - If only dosage/frequency mentioned, apply to last medicine
+       - Smart defaults: route="Oral", frequency="As directed"
     
-    5. **Smart Defaults for Medicines**:
-       - If route not specified → assume "Oral"
-       - If frequency not specified → assume "As directed"
-       - If dosage not specified → use "As prescribed"
+    5. **Multi-field Updates**: Commands can affect multiple fields
+       - "patient has fever, BP is 140/90" → update both subjective AND objective
     
-    6. **Multi-field Updates**:
-       - Commands can affect multiple fields simultaneously
-       - Example: "patient has fever and cough, give paracetamol" → update subjective AND medicines
+    6. **Maintain Language**: Keep output in ${language} script where applicable.
     
-    7. **Maintain Language**: Keep output in ${language} script where applicable.
+    7. **Return Format**: Return ONLY the updated JSON. NO explanations.
     
-    8. **Return Format**: Return ONLY the updated JSON. NO explanations, NO markdown.
+    EXAMPLES OF CORRECT FIELD MAPPING:
+    - "edit clinical findings that patient was having some issue" → update 'objective'
+    - "add fever to symptoms" → update 'subjective'
+    - "change diagnosis to hypertension" → update 'differentialDiagnosis'
+    - "BP is 120/80" → update 'objective'
+    - "patient complains of headache" → update 'subjective'
+    - "add paracetamol 500mg" → update 'medicines'
+    - "advise rest for 3 days" → update 'advice'
     
-    IMPORTANT: Be intelligent and flexible. The doctor may use casual, conversational language.
-    Your job is to understand the intent and make the appropriate changes to the prescription.
+    BE PRECISE: Match the command to the correct field based on medical context and keywords.
   `;
 
   try {
+    console.log('[Voice Edit] Processing command:', command);
+    console.log('[Voice Edit] Current data:', currentData);
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
       contents: `Apply this edit command: ${command}`,
@@ -467,7 +493,9 @@ export const processVoiceEdit = async (
       },
     });
 
-    return JSON.parse(response.text || 'null') as PrescriptionData;
+    const result = JSON.parse(response.text || 'null') as PrescriptionData;
+    console.log('[Voice Edit] Result:', result);
+    return result;
   } catch (error) {
     console.error("Voice edit processing error:", error);
     return null;
