@@ -98,6 +98,29 @@ const AppContent: React.FC = () => {
     setShowVerificationModal(false);
   };
 
+  const handleDoctorVerified = () => {
+    setIsDoctorVerified(true);
+    setShowVerificationModal(false);
+
+    // If there was a pending message, create a new chat with it
+    if (pendingVerificationMessage) {
+      const newChat: Chat = {
+        id: `chat-${Date.now()}`,
+        title: 'New Conversation',
+        messages: [{
+          id: `msg-${Date.now()}`,
+          sender: 'USER',
+          text: pendingVerificationMessage,
+          action_type: 'Informational',
+        }],
+        userRole: userRole,
+      };
+      setChats(prev => [newChat, ...prev]);
+      setActiveChatId(newChat.id);
+      setPendingVerificationMessage(null);
+    }
+  };
+
   const handleStartScribeSession = () => {
     setActiveView('scribe');
     if (window.innerWidth < 768) {
@@ -211,8 +234,7 @@ const AppContent: React.FC = () => {
       <LicenseVerificationModal
         isOpen={showVerificationModal}
         onClose={() => setShowVerificationModal(false)}
-        onVerified={handleDoctorVerified}
-        pendingMessage={pendingVerificationMessage}
+        onVerify={handleVerifyLicense}
       />
       <PrintViewModal
         isOpen={isPrintModalOpen}
