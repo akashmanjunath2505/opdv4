@@ -1,11 +1,14 @@
 import React from 'react';
 import { AlertCircle, TrendingUp } from 'lucide-react';
 import { useSubscription } from '../hooks/useSubscription';
+import { useAuth } from '../contexts/AuthContext';
 
 export const UsageLimitBanner: React.FC = () => {
     const { usage, subscription, canCreateCase } = useSubscription();
+    const { user } = useAuth();
 
-    if (!usage || usage.isUnlimited) return null;
+    // Don't show banner if user is not logged in
+    if (!user || !usage || usage.isUnlimited) return null;
 
     const usagePercentage = usage.limit ? (usage.used / usage.limit) * 100 : 0;
     const isNearLimit = usagePercentage >= 80;
@@ -24,7 +27,7 @@ export const UsageLimitBanner: React.FC = () => {
                             You've used all {usage.limit} free cases for today. Upgrade to continue without limits.
                         </p>
                         <button
-                            onClick={() => window.location.href = import.meta.env.VITE_API_URL?.replace('3001', '5173') + '#pricing' || 'http://localhost:5173#pricing'}
+                            onClick={() => window.location.href = 'https://aivanahealth.com#pricing'}
                             className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                         >
                             <TrendingUp className="w-4 h-4" />

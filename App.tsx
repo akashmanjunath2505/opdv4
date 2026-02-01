@@ -13,26 +13,11 @@ import { PrintViewModal } from './components/PrintViewModal';
 import { AboutModal } from './components/AboutModal';
 import { generateCaseSummary } from './services/geminiService';
 import { CaseSummaryModal } from './components/CaseSummaryModal';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { UsageLimitBanner } from './components/UsageLimitBanner';
 
-const AppContent: React.FC = () => {
-  const { user, loading } = useAuth();
+const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const userRole = UserRole.DOCTOR;
   const [language, setLanguage] = useState('English');
-
-  // Show loading screen while auth is initializing
-  if (loading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-aivana-dark">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-aivana-accent mx-auto mb-4"></div>
-          <p className="text-aivana-text-secondary">Loading...</p>
-        </div>
-      </div>
-    );
-  }
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
@@ -108,29 +93,6 @@ const AppContent: React.FC = () => {
   const handleVerifyLicense = () => {
     setIsDoctorVerified(true);
     setShowVerificationModal(false);
-  };
-
-  const handleDoctorVerified = () => {
-    setIsDoctorVerified(true);
-    setShowVerificationModal(false);
-
-    // If there was a pending message, create a new chat with it
-    if (pendingVerificationMessage) {
-      const newChat: Chat = {
-        id: `chat-${Date.now()}`,
-        title: 'New Conversation',
-        messages: [{
-          id: `msg-${Date.now()}`,
-          sender: 'USER',
-          text: pendingVerificationMessage,
-          action_type: 'Informational',
-        }],
-        userRole: userRole,
-      };
-      setChats(prev => [newChat, ...prev]);
-      setActiveChatId(newChat.id);
-      setPendingVerificationMessage(null);
-    }
   };
 
   const handleStartScribeSession = () => {
@@ -242,7 +204,6 @@ const AppContent: React.FC = () => {
       <main className="flex-1 flex flex-col bg-aivana-dark relative">
         {renderActiveView()}
       </main>
-      {/* Modals */}
       <LicenseVerificationModal
         isOpen={showVerificationModal}
         onClose={() => setShowVerificationModal(false)}
@@ -251,8 +212,7 @@ const AppContent: React.FC = () => {
       <PrintViewModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
-        chat={activeChat}
-        doctorProfile={doctorProfile}
+        protocols={knowledgeBaseProtocols}
       />
       <AboutModal
         isOpen={isAboutModalOpen}
@@ -261,19 +221,11 @@ const AppContent: React.FC = () => {
       <CaseSummaryModal
         isOpen={isSummaryModalOpen}
         onClose={() => setIsSummaryModalOpen(false)}
-        content={summaryContent}
+        summaryContent={summaryContent}
         isGenerating={isGeneratingSummary}
         chatTitle={activeChat?.title || "Case Summary"}
       />
     </div>
-  );
-};
-
-const App: React.FC = () => {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
   );
 };
 

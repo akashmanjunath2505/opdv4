@@ -10,8 +10,6 @@
   },
   "dependencies": {
     "@google/genai": "^1.19.0",
-    "axios": "^1.6.5",
-    "lucide-react": "^0.563.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
