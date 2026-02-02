@@ -385,6 +385,12 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             {/* LEFT SIDEBAR: SESSION INFO */}
             <div className="w-[300px] flex flex-col border-r border-white/5 bg-[#0f1014] z-20">
                 <div className="p-6 border-b border-white/5">
+                    {/* Replaced Global Sidebar Header */}
+                    <div className="flex items-center gap-2 mb-8">
+                        <Icon name="logo" className="w-6 h-6 text-white" />
+                        <span className="font-bold text-lg text-white">OPD Platform</span>
+                    </div>
+
                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-4">Session Info</h3>
                     <div className="bg-white/5 rounded-xl p-4 border border-white/5 mb-6">
                         <div className="text-[10px] uppercase text-gray-400 font-bold mb-1">Doctor Profile</div>
@@ -436,8 +442,8 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         <div key={entry.id} className={`max-w-[90%] ${entry.speaker === 'Doctor' ? 'self-end ml-auto' : 'self-start mr-auto'}`}>
                             <div className={`text-[9px] uppercase font-bold mb-1.5 ${entry.speaker === 'Doctor' ? 'text-right text-aivana-accent' : 'text-left text-gray-500'}`}>{entry.speaker}</div>
                             <div className={`p-4 rounded-2xl text-xs leading-relaxed ${entry.speaker === 'Doctor'
-                                    ? 'bg-aivana-accent/10 border border-aivana-accent/20 text-white rounded-tr-none'
-                                    : 'bg-[#1a1b20] border border-white/5 text-gray-300 rounded-tl-none'
+                                ? 'bg-aivana-accent/10 border border-aivana-accent/20 text-white rounded-tr-none'
+                                : 'bg-[#1a1b20] border border-white/5 text-gray-300 rounded-tl-none'
                                 }`}>
                                 {entry.text}
                             </div>

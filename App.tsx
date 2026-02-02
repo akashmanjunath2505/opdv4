@@ -183,25 +183,28 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen text-aivana-text bg-aivana-dark-sider">
-      <Sidebar
-        isOpen={sidebarOpen}
-        setIsOpen={setSidebarOpen}
-        gpts={relevantGpts}
-        chats={chats}
-        onNewChat={handleNewChat}
-        onSelectChat={handleSelectChat}
-        activeChat={activeChat}
-        activeChatId={activeChatId}
-        language={language}
-        setLanguage={setLanguage}
-        doctorProfile={doctorProfile}
-        setDoctorProfile={setDoctorProfile}
-        onStartScribeSession={handleStartScribeSession}
-        activeView={activeView}
-        onShowPrintModal={() => setIsPrintModalOpen(true)}
-        onShowAboutModal={() => setIsAboutModalOpen(true)}
-        onGenerateCaseSummary={handleGenerateCaseSummary}
-      />
+      {/* Sidebar - Hidden in Scribe Mode */}
+      {activeView !== 'scribe' && (
+        <Sidebar
+          isOpen={sidebarOpen}
+          setIsOpen={setSidebarOpen}
+          gpts={relevantGpts}
+          chats={chats}
+          onNewChat={handleNewChat}
+          onSelectChat={handleSelectChat}
+          activeChat={activeChat}
+          activeChatId={activeChatId}
+          language={language}
+          setLanguage={setLanguage}
+          doctorProfile={doctorProfile}
+          setDoctorProfile={setDoctorProfile}
+          onStartScribeSession={handleStartScribeSession}
+          activeView={activeView}
+          onShowPrintModal={() => setIsPrintModalOpen(true)}
+          onShowAboutModal={() => setIsAboutModalOpen(true)}
+          onGenerateCaseSummary={() => setIsSummaryModalOpen(true)}
+        />
+      )}
       <main className="flex-1 flex flex-col bg-aivana-dark relative">
         {renderActiveView()}
       </main>
