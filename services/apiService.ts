@@ -72,15 +72,20 @@ class ApiService {
         hospital_name: string;
         hospital_address: string;
         hospital_phone: string;
-    }): Promise<Session> {
+    }): Promise<{ session: Session; usage?: { cases_today: number; total_cases: number; subscription_tier: string; limit: number | null } }> {
+        const token = localStorage.getItem('auth_token');
         const response = await fetch(`${this.baseUrl}/api/sessions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
             body: JSON.stringify(patientData)
         });
 
         if (!response.ok) {
-            throw new Error('Failed to create session');
+            const error = await response.json();
+            throw new Error(error.message || error.error || 'Failed to create session');
         }
 
         return response.json();
