@@ -478,8 +478,13 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                 <span className="text-xs text-purple-200">Listening for edits...</span>
                             </div>
                         )}
-                        <button onClick={toggleVoiceEdit} title="Voice Edit" className={`p-2.5 rounded-xl transition-all ${isVoiceEditing ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}>
-                            <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-5 h-5 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
+                        <button onClick={toggleVoiceEdit} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}>
+                            <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-4 h-4 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
+                            <span>Voice Edit</span>
+                        </button>
+                        <button onClick={() => setShowPdfPreview(!showPdfPreview)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+                            <Icon name="document-text" className="w-4 h-4" />
+                            <span>PDF Preview</span>
                         </button>
                         {phase === 'active' && (
                             <button onClick={handleStopSession} className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95">Stop Session</button>
@@ -552,13 +557,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                             <textarea value={prescriptionData.advice} onChange={e => setPrescriptionData({ ...prescriptionData, advice: e.target.value })} className="w-full h-24 bg-[#0f1014] border border-white/5 rounded-xl p-4 text-white text-sm outline-none focus:border-aivana-accent focus:ring-1 focus:ring-aivana-accent transition-all resize-none" placeholder="Instructions for patient..." />
                         </div>
 
-                        {/* Preview Toggle */}
-                        <div className="pt-8 border-t border-white/5">
-                            <button onClick={() => setShowPdfPreview(!showPdfPreview)} className="w-full py-3 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/5 transition-all">
-                                {showPdfPreview ? "Hide Preview" : "Show PDF Preview"}
-                            </button>
-                            {showPdfPreview && <div className="mt-6"><PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview /></div>}
-                        </div>
+
                     </div>
                 </div>
 
@@ -567,6 +566,23 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center z-50">
                         <div className="w-16 h-16 border-t-2 border-aivana-accent rounded-full animate-spin mb-4"></div>
                         <h2 className="text-2xl font-bold text-white tracking-widest uppercase">Processing Session</h2>
+                    </div>
+                )}
+
+                {/* PDF Preview Modal */}
+                {showPdfPreview && (
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-8" onClick={() => setShowPdfPreview(false)}>
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+                                <h3 className="text-lg font-bold text-gray-900">Prescription Preview</h3>
+                                <button onClick={() => setShowPdfPreview(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                                    <Icon name="close" className="w-5 h-5 text-gray-600" />
+                                </button>
+                            </div>
+                            <div className="p-6">
+                                <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview />
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
