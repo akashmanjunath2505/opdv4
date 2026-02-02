@@ -481,31 +481,52 @@ export const processVoiceEdit = async (
 
     if (result.actions && Array.isArray(result.actions)) {
       for (const action of result.actions) {
+        console.log('[Voice Edit] Applying Action:', action);
+
         if (action.field === 'medicines') {
           if (action.type === 'ADD_MEDICINE') {
-            newData.medicines.push({
+            const newMed = {
               name: action.value.name || 'Unknown',
               dosage: action.value.dosage || 'As prescribed',
               frequency: action.value.frequency || 'As directed',
               route: action.value.route || 'Oral'
-            });
+            };
+            console.log('[Voice Edit] Adding Medicine:', newMed);
+            newData.medicines.push(newMed);
           } else if (action.type === 'UPDATE_LAST_MEDICINE') {
             if (newData.medicines.length > 0) {
               const lastMed = newData.medicines[newData.medicines.length - 1];
               newData.medicines[newData.medicines.length - 1] = { ...lastMed, ...action.value };
+              console.log('[Voice Edit] Updated Last Medicine:', newData.medicines[newData.medicines.length - 1]);
             }
           } else if (action.type === 'REMOVE') {
             newData.medicines = newData.medicines.filter(m => m.name.toLowerCase() !== action.value.name?.toLowerCase());
+            console.log('[Voice Edit] Removed Medicine:', action.value.name);
           }
         } else {
           // Text fields
-          const textValue = action.value.text || (typeof action.value === 'string' ? action.value : '');
+          // Fix: Handle cases where value is an object or string
+          let textValue = '';
+          if (typeof action.value === 'string') {
+            textValue = action.value;
+          } else if (action.value && typeof action.value === 'object') {
+            textValue = action.value.text || action.value.value || '';
+          }
+
+          console.log(`[Voice Edit] Text Field Update: Field=${action.field}, Type=${action.type}, Value="${textValue}"`);
+
+          if (!textValue) {
+            console.warn('[Voice Edit] Warning: textValue is empty for action:', action);
+          }
 
           if (action.type === 'UPDATE') {
             (newData as any)[action.field] = textValue;
           } else if (action.type === 'APPEND') {
             const currentText = (newData as any)[action.field] || '';
-            (newData as any)[action.field] = currentText ? `${currentText}, ${textValue}` : textValue;
+            const separator = currentText.endsWith('.') ? ' ' : ', ';
+            (newData as any)[action.field] = currentText ? `${currentText}${separator}${textValue}` : textValue;
+          } else {
+            console.warn('[Voice Edit] Warning: Unknown action type for text field:', action.type);
           }
         }
       }
