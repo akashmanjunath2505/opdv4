@@ -375,7 +375,11 @@ export const processVoiceEdit = async (
     "${command}"
     
     RETURN FORMAT:
-    Return a JSON object with an "actions" array. Each action must have:
+    Return a JSON object with:
+    - thought_process: A brief explanation of your reasoning.
+    - actions: An array of action objects.
+
+    Each action must have:
     - type: "UPDATE" | "APPEND" | "ADD_MEDICINE" | "REMOVE"
     - field: "subjective" | "objective" | "differentialDiagnosis" | "labResults" | "advice" | "medicines"
     - value: (string for text fields, object for medicines)
@@ -393,19 +397,34 @@ export const processVoiceEdit = async (
     
     EXAMPLES:
     Command: "Add fever to symptoms"
-    Output: { "actions": [{ "type": "APPEND", "field": "subjective", "value": "Fever" }] }
+    Output: { 
+      "thought_process": "User explicitly asked to add a symptom to subjective.",
+      "actions": [{ "type": "APPEND", "field": "subjective", "value": "Fever" }] 
+    }
     
     Command: "Change diagnosis to Diabetes"
-    Output: { "actions": [{ "type": "UPDATE", "field": "differentialDiagnosis", "value": "Diabetes Mellitus" }] }
+    Output: { 
+      "thought_process": "User asked to change the diagnosis. This is an UPDATE to differentialDiagnosis.",
+      "actions": [{ "type": "UPDATE", "field": "differentialDiagnosis", "value": "Diabetes Mellitus" }] 
+    }
     
     Command: "Add Paracetamol 500mg twice daily"
-    Output: { "actions": [{ "type": "ADD_MEDICINE", "field": "medicines", "value": { "name": "Paracetamol", "dosage": "500mg", "frequency": "Twice Daily", "route": "Oral" } }] }
+    Output: { 
+      "thought_process": "User adding a new medicine.",
+      "actions": [{ "type": "ADD_MEDICINE", "field": "medicines", "value": { "name": "Paracetamol", "dosage": "500mg", "frequency": "Twice Daily", "route": "Oral" } }] 
+    }
     
     Command: "Edit clinical findings that patient has mild tenderness"
-    Output: { "actions": [{ "type": "UPDATE", "field": "objective", "value": "Mild tenderness present" }] }
+    Output: { 
+      "thought_process": "User wants to edit objective findings.",
+      "actions": [{ "type": "UPDATE", "field": "objective", "value": "Mild tenderness present" }] 
+    }
     
     Command: "Actually make it 650mg" (Context: last medicine was Paracetamol)
-    Output: { "actions": [{ "type": "UPDATE_LAST_MEDICINE", "field": "medicines", "value": { "dosage": "650mg" } }] }
+    Output: { 
+      "thought_process": "User correcting the dosage of the last added medicine.",
+      "actions": [{ "type": "UPDATE_LAST_MEDICINE", "field": "medicines", "value": { "dosage": "650mg" } }] 
+    }
   `;
 
   try {
@@ -421,6 +440,7 @@ export const processVoiceEdit = async (
         responseSchema: {
           type: Type.OBJECT,
           properties: {
+            thought_process: { type: Type.STRING },
             actions: {
               type: Type.ARRAY,
               items: {
@@ -431,12 +451,8 @@ export const processVoiceEdit = async (
                   value: {
                     type: Type.OBJECT,
                     properties: {
-                      // For text fields, value will be a string wrapper or simple string logic handled by prompt
-                      // But for schema strictness we can perform a trick or just use string for text and object for meds.
-                      // To simplify schema, let's make value flexible or stringify it? 
-                      // Easier: Use a generic object structure
-                      text: { type: Type.STRING }, // For text fields
-                      name: { type: Type.STRING }, // For meds
+                      text: { type: Type.STRING },
+                      name: { type: Type.STRING },
                       dosage: { type: Type.STRING },
                       frequency: { type: Type.STRING },
                       route: { type: Type.STRING }
@@ -445,7 +461,8 @@ export const processVoiceEdit = async (
                 }
               }
             }
-          }
+          },
+          required: ["thought_process", "actions"]
         }
       }
     });
