@@ -107,12 +107,10 @@ class AuthService {
 
     async getCurrentUser(): Promise<User> {
         // 1. Get Auth User
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-        if (authError || !authUser) {
-            console.log('getCurrentUser: No auth user found');
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
             throw new Error('Not authenticated');
         }
-        console.log('getCurrentUser: Auth user found:', authUser.id);
 
         // 2. Get Public Profile
         const { data: profile, error } = await supabase
