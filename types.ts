@@ -36,6 +36,7 @@ export interface Citation {
 }
 
 export interface DoctorProfile {
+  name: string;
   qualification: 'MBBS' | 'BAMS' | 'BHMS';
   canPrescribeAllopathic: 'yes' | 'limited' | 'no';
 }

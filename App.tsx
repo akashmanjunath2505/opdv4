@@ -27,6 +27,7 @@ const App: React.FC = () => {
   const [pendingFirstMessage, setPendingFirstMessage] = useState<string | null>(null);
 
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile>({
+    name: 'Dr. Sharma',
     qualification: 'BAMS',
     canPrescribeAllopathic: 'no'
   });
