@@ -458,7 +458,8 @@ export const processVoiceEdit = async (
                       route: { type: Type.STRING }
                     }
                   }
-                }
+                },
+                required: ["type", "field", "value"]
               }
             }
           },
