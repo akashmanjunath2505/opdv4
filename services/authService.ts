@@ -92,7 +92,7 @@ class AuthService {
         return { user, token: authData.session?.access_token || '' };
     }
 
-    async login(data: LoginData): Promise<{ user: User; token: string }> {
+    async login(data: LoginData): Promise<{ user: Partial<User> | null; token: string }> {
         const { data: authData, error } = await supabase.auth.signInWithPassword({
             email: data.email,
             password: data.password
@@ -101,8 +101,10 @@ class AuthService {
         if (error) throw new Error(error.message);
         if (!authData.user) throw new Error('Login failed');
 
-        const user = await this.getCurrentUser();
-        return { user, token: authData.session?.access_token || '' };
+        // Note: We do NOT fetch the full profile here to prevent race conditions.
+        // The AuthContext's onAuthStateChange listener will handle fetching the full profile.
+
+        return { user: null, token: authData.session?.access_token || '' };
     }
 
     async getCurrentUser(): Promise<User> {
