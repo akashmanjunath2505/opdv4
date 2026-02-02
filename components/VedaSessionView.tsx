@@ -588,33 +588,42 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             {/* RIGHT PANEL: MAIN EDITOR (Bigger Focus) */}
             <div className={`${phase === 'active' ? 'w-[450px]' : 'flex-1'} flex flex-col relative bg-aivana-dark transition-all duration-500`}>
                 {/* Header Bar */}
-                <header className="h-16 border-b border-white/5 bg-black/20 px-6 flex items-center justify-between">
-                    <div className="flex items-center gap-6">
+                <header className="h-16 border-b border-white/5 bg-black/20 px-4 flex items-center justify-between">
+                    <div className={`flex items-center gap-${phase === 'active' ? '2' : '6'}`}>
                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${phase === 'active' ? 'bg-red-500/10 border-red-500/30 text-red-500' : 'bg-green-500/10 border-green-500 text-green-500'}`}>
                             <div className={`w-1.5 h-1.5 rounded-full ${phase === 'active' ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
-                            {phase === 'active' ? 'Live Recording' : 'Standby'}
+                            {phase === 'active' ? 'REC' : 'Standby'}
                         </div>
                         <span className="text-lg font-medium text-white tabular-nums">{formatTime(duration)}</span>
                         <VoiceVisualizer isActive={phase === 'active'} />
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         {isVoiceEditing && (
                             <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-lg animate-fadeIn">
                                 <Icon name="microphone" className="w-3 h-3 text-purple-400 animate-pulse" />
-                                <span className="text-xs text-purple-200">Listening for edits...</span>
+                                <span className="text-xs text-purple-200 hidden md:inline">Listening...</span>
                             </div>
                         )}
-                        <button onClick={toggleVoiceEdit} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}>
-                            <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-4 h-4 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
-                            <span>Voice Edit</span>
-                        </button>
-                        <button onClick={() => setShowPdfPreview(!showPdfPreview)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all">
-                            <Icon name="document-text" className="w-4 h-4" />
-                            <span>PDF Preview</span>
-                        </button>
+
+                        {/* Hide tools during active recording to save space and reduce distraction */}
+                        {phase !== 'active' && (
+                            <>
+                                <button onClick={toggleVoiceEdit} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}>
+                                    <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-4 h-4 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
+                                    <span className="hidden lg:inline">Voice Edit</span>
+                                </button>
+                                <button onClick={() => setShowPdfPreview(!showPdfPreview)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+                                    <Icon name="document-text" className="w-4 h-4" />
+                                    <span className="hidden lg:inline">PDF</span>
+                                </button>
+                            </>
+                        )}
+
                         {phase === 'active' && (
-                            <button onClick={handleStopSession} className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95">Stop Session</button>
+                            <button onClick={handleStopSession} className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95 whitespace-nowrap">
+                                Stop Session
+                            </button>
                         )}
                         <button onClick={onEndSession} className="p-2 text-gray-500 hover:text-white transition-colors"><Icon name="x" className="w-5 h-5" /></button>
                     </div>
@@ -623,13 +632,12 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 {/* Active Recording Placeholder */}
                 {phase === 'active' && (
                     <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20 text-center">
-                        <div className="w-24 h-24 mb-6 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
-                            <Icon name="microphone" className="w-10 h-10 text-red-500" />
+                        <div className="w-20 h-20 mb-6 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
+                            <Icon name="microphone" className="w-8 h-8 text-red-500" />
                         </div>
-                        <h3 className="text-xl font-bold text-white mb-2">Recording in Progress</h3>
-                        <p className="text-sm text-gray-500 max-w-xs">
-                            The transcript is expanding to capture the full conversation.
-                            The editor will reappear once the session ends.
+                        <h3 className="text-lg font-bold text-white mb-2">Recording in Progress</h3>
+                        <p className="text-sm text-gray-500 max-w-[200px]">
+                            Live transcription is active in the expanded center panel.
                         </p>
                     </div>
                 )}
