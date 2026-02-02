@@ -7,7 +7,7 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-config({ path: '.env.local' });
+config(); // Loads .env by default
 
 const { Pool } = pg;
 
