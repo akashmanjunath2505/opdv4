@@ -3,7 +3,7 @@ import cors from 'cors';
 import { config } from 'dotenv';
 import pg from 'pg';
 
-config({ path: '.env.local' });
+config(); // Loads .env by default
 
 const { Pool } = pg;
 const app = express();
@@ -24,6 +24,146 @@ app.use(express.json());
 // Health check
 app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', message: 'OPD Platform API is running' });
+});
+
+// ==================== AUTHENTICATION ENDPOINTS ====================
+
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+
+// Register endpoint
+app.post('/api/auth/register', async (req: Request, res: Response) => {
+    try {
+        const {
+            name, email, password, qualification, registration_number,
+            phone, can_prescribe_allopathic, hospital_name, hospital_phone, hospital_address
+        } = req.body;
+
+        // Validate required fields
+        if (!name || !email || !password || !qualification) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        // Check if user already exists
+        const existingUser = await pool.query(
+            'SELECT id FROM users WHERE email = $1',
+            [email]
+        );
+
+        if (existingUser.rows.length > 0) {
+            return res.status(400).json({ error: 'User with this email already exists' });
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create user
+        const result = await pool.query(
+            `INSERT INTO users (
+                name, email, password_hash, qualification, registration_number,
+                phone, can_prescribe_allopathic, hospital_name, hospital_phone,
+                hospital_address, subscription_tier, subscription_status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'free', 'active')
+            RETURNING id, name, email, qualification, registration_number, phone,
+                      can_prescribe_allopathic, hospital_name, hospital_phone, hospital_address,
+                      subscription_tier, subscription_status, cases_today, total_cases, created_at`,
+            [name, email, hashedPassword, qualification, registration_number, phone,
+                can_prescribe_allopathic, hospital_name, hospital_phone, hospital_address]
+        );
+
+        const user = result.rows[0];
+
+        // Generate JWT token
+        const token = jwt.sign(
+            { userId: user.id },
+            process.env.JWT_SECRET!,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        );
+
+        res.status(201).json({ user, token });
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).json({ error: 'Failed to register user' });
+    }
+});
+
+// Login endpoint
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
+        }
+
+        // Find user
+        const result = await pool.query(
+            `SELECT id, name, email, password_hash, qualification, registration_number,
+                    phone, can_prescribe_allopathic, hospital_name, hospital_phone,
+                    hospital_address, subscription_tier, subscription_status,
+                    cases_today, total_cases, created_at
+             FROM users WHERE email = $1`,
+            [email]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        const user = result.rows[0];
+
+        // Verify password
+        const isValidPassword = await bcrypt.compare(password, user.password_hash);
+        if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        // Remove password hash from response
+        delete user.password_hash;
+
+        // Generate JWT token
+        const token = jwt.sign(
+            { userId: user.id },
+            process.env.JWT_SECRET!,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        );
+
+        res.json({ user, token });
+    } catch (error) {
+        console.error('Error logging in:', error);
+        res.status(500).json({ error: 'Failed to login' });
+    }
+});
+
+// Get current user endpoint
+app.get('/api/auth/me', async (req: Request, res: Response) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'No token provided' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+
+        const result = await pool.query(
+            `SELECT id, name, email, qualification, registration_number, phone,
+                    can_prescribe_allopathic, hospital_name, hospital_phone, hospital_address,
+                    profile_picture_url, subscription_tier, subscription_status,
+                    cases_today, total_cases, last_case_date, created_at
+             FROM users WHERE id = $1`,
+            [decoded.userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        res.status(401).json({ error: 'Invalid token' });
+    }
 });
 
 // ==================== SESSION ENDPOINTS ====================
