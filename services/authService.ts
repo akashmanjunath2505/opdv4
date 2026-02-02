@@ -1,5 +1,7 @@
-// Auth Service for Frontend
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { supabase } from '../lib/supabase';
+
+// Auth Service using Supabase Auth
+// Replaces custom backend logic
 
 export interface User {
     id: string;
@@ -15,12 +17,9 @@ export interface User {
     hospital_phone?: string;
     subscription_tier: 'free' | 'premium';
     subscription_status: string;
-    subscription_end_date?: string;
     cases_today: number;
     total_cases: number;
-    last_case_date?: string;
     created_at: string;
-    last_login?: string;
 }
 
 export interface RegisterData {
@@ -34,6 +33,7 @@ export interface RegisterData {
     hospital_name?: string;
     hospital_address?: string;
     hospital_phone?: string;
+    hospital_logo?: File | null;
 }
 
 export interface LoginData {
@@ -42,89 +42,98 @@ export interface LoginData {
 }
 
 class AuthService {
-    private token: string | null = null;
-
-    constructor() {
-        // Load token from localStorage on init
-        this.token = localStorage.getItem('auth_token');
-    }
 
     async register(data: RegisterData): Promise<{ user: User; token: string }> {
-        const response = await fetch(`${API_URL}/api/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+        // 1. Sign up with Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: data.email,
+            password: data.password
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Registration failed');
+        if (authError) throw new Error(authError.message);
+        if (!authData.user) throw new Error('Registration failed: No user returned');
+
+        const userId = authData.user.id;
+
+        // 2. Create Profile in public.users table
+        const profileData = {
+            id: userId,
+            email: data.email,
+            name: data.name,
+            qualification: data.qualification,
+            can_prescribe_allopathic: data.can_prescribe_allopathic,
+            phone: data.phone || null,
+            registration_number: data.registration_number || null,
+            hospital_name: data.hospital_name || null,
+            hospital_address: data.hospital_address || null,
+            hospital_phone: data.hospital_phone || null,
+            subscription_tier: 'free',
+            subscription_status: 'active',
+            cases_today: 0,
+            total_cases: 0,
+            password_hash: 'managed_by_supabase' // Placeholder to satisfy schema constraints
+        };
+
+        const { error: profileError } = await supabase
+            .from('users')
+            .insert(profileData);
+
+        if (profileError) {
+            // Rollback auth user if profile creation fails? (Ideal but complex)
+            console.error('Profile creation failed:', profileError);
+            throw new Error('Failed to create user profile: ' + profileError.message);
         }
 
-        const result = await response.json();
-        this.setToken(result.token);
-        return result;
+        // 3. Return user structure expected by app
+        const user: User = {
+            ...profileData,
+            created_at: new Date().toISOString(),
+            subscription_tier: 'free'
+        };
+
+        return { user, token: authData.session?.access_token || '' };
     }
 
     async login(data: LoginData): Promise<{ user: User; token: string }> {
-        const response = await fetch(`${API_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+        const { data: authData, error } = await supabase.auth.signInWithPassword({
+            email: data.email,
+            password: data.password
         });
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Login failed');
-        }
+        if (error) throw new Error(error.message);
+        if (!authData.user) throw new Error('Login failed');
 
-        const result = await response.json();
-        this.setToken(result.token);
-        return result;
+        // Fetch User Profile
+        const user = await this.getCurrentUser();
+        return { user, token: authData.session?.access_token || '' };
     }
 
     async getCurrentUser(): Promise<User> {
-        if (!this.token) {
-            throw new Error('No authentication token');
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+
+        if (!authUser) throw new Error('Not authenticated');
+
+        const { data: profile, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .single();
+
+        if (error || !profile) {
+            throw new Error('User profile not found');
         }
 
-        const response = await fetch(`${API_URL}/api/auth/me`, {
-            headers: {
-                'Authorization': `Bearer ${this.token}`
-            }
-        });
-
-        if (!response.ok) {
-            if (response.status === 401) {
-                this.logout();
-            }
-            throw new Error('Failed to get user');
-        }
-
-        const result = await response.json();
-        return result.user;
+        return profile as User;
     }
 
-    setToken(token: string) {
-        this.token = token;
-        localStorage.setItem('auth_token', token);
-    }
-
-    getToken(): string | null {
-        return this.token;
-    }
-
-    logout() {
-        this.token = null;
-        localStorage.removeItem('auth_token');
+    async logout() {
+        await supabase.auth.signOut();
+        localStorage.removeItem('auth_token'); // Cleanup legacy if exists
     }
 
     isAuthenticated(): boolean {
-        return !!this.token;
-    }
-
-    getAuthHeader(): { Authorization: string } | {} {
-        return this.token ? { Authorization: `Bearer ${this.token}` } : {};
+        // This is synchronous check, might need async verification
+        return !!localStorage.getItem('sb-zdsohbjczbdktczzzujf-auth-token');
     }
 }
 

@@ -1,116 +1,117 @@
-// MOCK API IMPLEMENTATION (Frontend Revert)
-// This file replaces real API calls with simulation for "Website Mode"
+import { supabase } from './lib/supabase';
 
-const MOCK_DELAY = 800;
+// Supabase-based API Service
+// Replaces the Axios backend client
 
-const mockUser = {
-    id: 'mock-user-123',
-    name: 'Dr. Akash',
-    email: 'akash@example.com',
-    qualification: 'MBBS',
-    hospital_name: 'Akash Clinic',
-    subscription_status: 'active',
-    subscription_tier: 'premium',
-    cases_today: 5,
-    total_cases: 120
+const getUserId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    return user.id;
 };
 
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Mock Axios-like interface
+// We keep the structure to minimize refactoring in components
 const api = {
-    interceptors: {
-        request: { use: () => { } },
-        response: { use: () => { } }
-    },
+    // Legacy axios compatibility stub (if any component uses api.get directly)
+    // Ideally components should use exported *API objects
     get: async () => ({ data: {} }),
     post: async () => ({ data: {} }),
-    put: async () => ({ data: {} }),
-    delete: async () => ({ data: {} })
 };
 
 export default api;
 
 export const authAPI = {
-    signup: async (data: any) => {
-        await wait(MOCK_DELAY);
-        return { data: { user: { ...mockUser, ...data }, token: 'mock-jwt-token' } };
-    },
-    login: async (data: any) => {
-        await wait(MOCK_DELAY);
-        return { data: { user: mockUser, token: 'mock-jwt-token' } };
-    },
-    refresh: async () => {
-        await wait(MOCK_DELAY);
-        return { data: { token: 'new-mock-token' } };
-    }
+    // Handled by authService mostly
 };
 
 export const userAPI = {
     getProfile: async () => {
-        await wait(MOCK_DELAY);
-        return { data: mockUser };
+        const userId = await getUserId();
+        const { data, error } = await supabase.from('users').select('*').eq('id', userId).single();
+        if (error) throw error;
+        return { data };
     },
-    updateProfile: async (data: any) => {
-        await wait(MOCK_DELAY);
-        return { data: { ...mockUser, ...data } };
+    updateProfile: async (updates: any) => {
+        const userId = await getUserId();
+        const { data, error } = await supabase.from('users').update(updates).eq('id', userId).select().single();
+        if (error) throw error;
+        return { data };
     },
     getDoctorProfile: async () => {
-        await wait(MOCK_DELAY);
-        return { data: mockUser };
+        return userAPI.getProfile();
     },
-    updateDoctorProfile: async (data: any) => {
-        await wait(MOCK_DELAY);
-        return { data: { ...mockUser, ...data } };
-    },
-    uploadLogo: async () => {
-        await wait(MOCK_DELAY);
-        return { data: { success: true } };
-    }
+    // ...
 };
 
 export const subscriptionAPI = {
-    getPlans: async () => {
-        await wait(MOCK_DELAY);
-        return { data: [] };
-    },
-    getCurrent: async () => {
-        await wait(MOCK_DELAY);
-        return { data: { status: 'active', tier: 'premium' } };
-    },
+    // For now, we mock subscription API on top of Supabase or use Stripe integration via frontend? 
+    // User deleted backend scripts, so Stripe Checkout via backend is GONE.
+    // We will return Free Tier for now.
+    getPlans: async () => ({ data: [] }),
+    getCurrent: async () => ({ data: { status: 'active', tier: 'free' } }),
     getUsage: async () => {
-        await wait(MOCK_DELAY);
-        return { data: { cases_today: 5, limit: 10 } };
-    },
-    createCheckoutSession: async () => {
-        await wait(MOCK_DELAY);
-        return { data: { url: '#' } };
-    },
-    cancel: async () => {
-        await wait(MOCK_DELAY);
-        return { data: { status: 'cancelled' } };
+        const userId = await getUserId();
+        const { data } = await supabase.from('users').select('cases_today, subscription_tier').eq('id', userId).single();
+        // Default limit
+        const limit = data.subscription_tier === 'premium' ? 9999 : 10;
+        return { data: { cases_today: data.cases_today, limit } };
     }
+    // createCheckoutSession -> Cannot work without backend (Stripe Secret Key). 
+    // Maybe user handles via Supabase Functions?
 };
 
 export const casesAPI = {
-    create: async () => {
-        await wait(MOCK_DELAY);
-        return { data: { id: 'case-1' } };
+    create: async (data: any) => {
+        const userId = await getUserId();
+        // Map frontend fields to DB schema
+        const { data: session, error } = await supabase
+            .from('sessions')
+            .insert({
+                user_id: userId,
+                patient_name: data.patientName || data.patient_name,
+                patient_age: data.patientAge || data.patient_age,
+                patient_sex: data.patientSex || data.patient_sex,
+                patient_mobile: data.patientMobile || data.patient_mobile,
+                // Add validation or optional fields handling
+                status: 'active'
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { data: session };
     },
     list: async () => {
-        await wait(MOCK_DELAY);
-        return { data: [] };
+        const userId = await getUserId();
+        const { data, error } = await supabase
+            .from('sessions')
+            .select('*')
+            .eq('user_id', userId)
+            .order('started_at', { ascending: false });
+        if (error) throw error;
+        return { data: data || [] };
     },
-    get: async () => {
-        await wait(MOCK_DELAY);
-        return { data: {} };
+    get: async (id: string) => {
+        const { data, error } = await supabase.from('sessions').select('*').eq('id', id).single();
+        if (error) throw error;
+        return { data };
     },
-    update: async () => {
-        await wait(MOCK_DELAY);
-        return { data: {} };
+    update: async (id: string, updates: any) => {
+        const { data, error } = await supabase.from('sessions').update(updates).eq('id', id).select().single();
+        if (error) throw error;
+        return { data };
+    }
+};
+
+// Export specialized APIs for Transcripts/Prescriptions as they might be called
+export const transcriptAPI = {
+    add: async (data: any) => {
+        const { data: transcript, error } = await supabase.from('transcripts').insert(data).select().single();
+        if (error) throw error;
+        return { data: transcript };
     },
-    delete: async () => {
-        await wait(MOCK_DELAY);
-        return { data: {} };
+    list: async (sessionId: string) => {
+        const { data, error } = await supabase.from('transcripts').select('*').eq('session_id', sessionId).order('created_at');
+        if (error) throw error;
+        return { data: data || [] };
     }
 };
