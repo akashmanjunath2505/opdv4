@@ -227,7 +227,15 @@ export const generateClinicalNote = async (
     GENERATION RULES:
     1. **Cleanup First**: Internally clean the transcript to remove fillers and correct medical terms before extraction.
     2. **Subjective**: Summarize patient's complaints/symptoms.
-    3. **Objective**: Summarize physical findings.
+    3. **Objective**: Summarize physical findings. **CRITICAL**: Always include units and symbols for all measurements:
+       - Blood Pressure: "BP: 120/80 mmHg"
+       - Temperature: "Temp: 98.6°F" or "37°C"
+       - Heart Rate: "HR: 72 bpm" or "Pulse: 72/min"
+       - Respiratory Rate: "RR: 18/min"
+       - SpO2: "SpO2: 98%"
+       - Weight: "Weight: 70 kg"
+       - Height: "Height: 170 cm"
+       - Any other measurements with appropriate units
     4. **Assessment**: Leave as empty string "".
     5. **Differential Diagnosis**: Primary Diagnosis followed by other potential diagnoses considered.
     6. **Lab Results**: Any tests, vitals, or investigations mentioned.
@@ -393,6 +401,10 @@ export const processVoiceEdit = async (
     - **Symptom vs. Diagnosis**: If the doctor says "Patient has Diabetes", that is a **Diagnosis** (\`differentialDiagnosis\`). If they say "Patient has a headache", that is a **Symptom** (\`subjective\`). Use your medical knowledge.
     - **Implicit Context**: If the command is "Make it 500mg", assume they are talking about the *last added medicine*.
     - **Formatting**: Ensure your \`value\` output is clean, capitalized, and professional (e.g., "diabetes" -> "Type 2 Diabetes Mellitus" if appropriate context allows, otherwise keep it faithful).
+    - **Clinical Findings with Units**: When adding/updating \`objective\` field, ALWAYS include proper units:
+      * BP: "120/80 mmHg", Temp: "98.6°F", HR: "72 bpm", RR: "18/min", SpO2: "98%", Weight: "70 kg", Height: "170 cm"
+      * If doctor says "BP is 120 by 80", format as "BP: 120/80 mmHg"
+      * If doctor says "temperature 98", format as "Temp: 98°F"
 
     **OUTPUT FORMAT (JSON)**:
     {

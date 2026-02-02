@@ -575,9 +575,18 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
                                 <h3 className="text-lg font-bold text-gray-900">Prescription Preview</h3>
-                                <button onClick={() => setShowPdfPreview(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                    <Icon name="close" className="w-5 h-5 text-gray-600" />
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => window.print()}
+                                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                                    >
+                                        <Icon name="download" className="w-4 h-4" />
+                                        <span>Download PDF</span>
+                                    </button>
+                                    <button onClick={() => setShowPdfPreview(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                                        <Icon name="close" className="w-5 h-5 text-gray-600" />
+                                    </button>
+                                </div>
                             </div>
                             <div className="p-6">
                                 <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview />
