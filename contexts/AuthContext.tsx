@@ -50,25 +50,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         initSession();
 
+        // Safety Timeout: Force loading to false after 6 seconds to prevent infinite load
+        const safetyTimeout = setTimeout(() => {
+            if (loading) {
+                console.warn('Auth loading timed out, forcing UI render.');
+                setLoading(false);
+            }
+        }, 6000);
+
         // Listen for Real-time Auth State Changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             console.log('Auth State Change:', event);
 
             if (event === 'SIGNED_IN' && session) {
                 try {
+                    console.log('Fetching user profile...');
                     const currentUser = await authService.getCurrentUser();
-                    if (mounted) setUser(currentUser);
+                    if (mounted) {
+                        setUser(currentUser);
+                        // Ensure loading is cleared if this event happens after a delay
+                        setLoading(false);
+                    }
                 } catch (err: any) {
                     console.error('Profile fetch failed:', err);
                     toast.error('Login successful, but profile could not be loaded.');
+                    if (mounted) setLoading(false);
                 }
             } else if (event === 'SIGNED_OUT') {
                 if (mounted) setUser(null);
+                setLoading(false);
             }
         });
 
         return () => {
             mounted = false;
+            clearTimeout(safetyTimeout);
             subscription.unsubscribe();
         };
     }, []);
