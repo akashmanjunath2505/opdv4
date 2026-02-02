@@ -1,6 +1,7 @@
 {
   "name": "opd-platform",
   "private": true,
+  "description": "OPD Platform hosted at opd.aivanahealth.com",
   "version": "0.0.0",
   "type": "module",
   "scripts": {

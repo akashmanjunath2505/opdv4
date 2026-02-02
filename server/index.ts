@@ -18,7 +18,10 @@ const pool = new Pool({
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['https://opd.aivanahealth.com', 'http://localhost:3000', 'http://localhost:3001', 'https://opdv4.vercel.app'],
+    credentials: true
+}));
 app.use(express.json());
 
 // Health check

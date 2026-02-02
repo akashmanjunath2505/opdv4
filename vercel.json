@@ -10,9 +10,5 @@
             "source": "/api/(.*)",
             "destination": "/api/$1"
         }
-    ],
-    "env": {
-        "VITE_API_URL": "/api",
-        "DATABASE_URL": "@database_url"
-    }
+    ]
 }

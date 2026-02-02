@@ -1,5 +1,5 @@
 // API Service for OPD Platform Backend
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = 'https://opd.aivanahealth.com/api';
 
 export interface Session {
     id: string;

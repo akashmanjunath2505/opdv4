@@ -113,7 +113,7 @@ CREATE TABLE payments (
 ### Base URL
 
 **Local Development**: `http://localhost:3000`  
-**Production**: `https://your-app.vercel.app`
+**Production**: `https://opd.aivanahealth.com`
 
 All API endpoints are prefixed with `/api`
 
