@@ -1,5 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authService, User, RegisterData } from '../services/authService';
+import { User, RegisterData } from '../services/authService';
+
+// NO-AUTH MODE: Default Guest User with Premium Access
+const GUEST_USER: User = {
+    id: 'guest_doctor',
+    name: 'Guest Doctor',
+    email: 'guest@aivanahealth.com',
+    qualification: 'MBBS',
+    can_prescribe_allopathic: 'yes',
+    hospital_name: 'My Clinic',
+    hospital_address: '',
+    phone: '',
+    registration_number: '',
+    subscription_tier: 'premium', // Unlocks unlimited usage
+    subscription_status: 'active',
+    cases_today: 0,
+    total_cases: 0,
+    created_at: new Date().toISOString()
+};
 
 interface AuthContextType {
     user: User | null;
@@ -13,47 +31,29 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    // Always start authenticated
+    const [user, setUser] = useState<User | null>(GUEST_USER);
+    // Never show loading spinner
+    const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        // Check if user is logged in on mount
-        const loadUser = async () => {
-            if (authService.isAuthenticated()) {
-                try {
-                    const currentUser = await authService.getCurrentUser();
-                    setUser(currentUser);
-                } catch (error) {
-                    console.error('Failed to load user:', error);
-                    authService.logout();
-                }
-            }
-            setLoading(false);
-        };
-
-        loadUser();
-    }, []);
-
+    // Login just sets the guest user (or could be no-op)
     const login = async (email: string, password: string) => {
-        const result = await authService.login({ email, password });
-        setUser(result.user);
+        setUser(GUEST_USER);
     };
 
+    // Register just sets the guest user
     const register = async (data: RegisterData) => {
-        const result = await authService.register(data);
-        setUser(result.user);
+        setUser({ ...GUEST_USER, name: data.name, email: data.email });
     };
 
+    // Logout resets to Guest User (so they are never "out")
     const logout = () => {
-        authService.logout();
-        setUser(null);
+        setUser(GUEST_USER);
     };
 
     const refreshUser = async () => {
-        if (authService.isAuthenticated()) {
-            const currentUser = await authService.getCurrentUser();
-            setUser(currentUser);
-        }
+        // No-op in no-auth mode
+        setUser(GUEST_USER);
     };
 
     return (
