@@ -1,6 +1,6 @@
-import * as bcryptPkg from 'bcryptjs';
-const bcrypt = (bcryptPkg as any).default || bcryptPkg;
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+
 import type { Request, Response, NextFunction } from 'express';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
