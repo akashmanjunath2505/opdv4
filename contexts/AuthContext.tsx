@@ -63,13 +63,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     const currentUser = await authService.getCurrentUser();
                     if (mounted) {
                         setUser(currentUser);
-                        setLoading(false); // <--- Ensuring loading is cleared when we know we are signed in
+                        setLoading(false);
                         clearTimeout(safetyTimeout);
+                        toast.success('Welcome back!'); // Show success here
                     }
                 } catch (err: any) {
                     console.error('Profile fetch failed:', err);
                     toast.error('Login successful, but profile could not be loaded.');
-                    if (mounted) setLoading(false); // Fail gracefully
+                    if (mounted) setLoading(false);
                 }
             } else if (event === 'SIGNED_OUT') {
                 if (mounted) {
@@ -89,13 +90,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const login = async (email: string, password: string) => {
         const toastId = toast.loading('Signing in...');
         try {
-            const result = await authService.login({ email, password });
-            setUser(result.user);
-            toast.success('Welcome back!', { id: toastId });
+            // We just trigger the login. The state change is handled by onAuthStateChange
+            await authService.login({ email, password });
+
+            // We don't need to manually setUser here as the event listener will do it.
+            // But we should dismiss the toast when we are sure.
+            // Actually, waiting for the user state to update might be better.
+
+            toast.dismiss(toastId);
         } catch (err: any) {
             console.error('Login failed:', err);
             toast.error(err.message || 'Login failed', { id: toastId });
-            throw err; // Re-throw to let component know
+            throw err;
         }
     };
 
