@@ -3,12 +3,22 @@ import { Pool } from 'pg';
 import { hashPassword, validatePassword, validateEmail, generateToken } from '../../server/auth';
 import setCorsHeaders from '../../utils/cors';
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
+let pool: Pool;
+
+function getDb() {
+    if (!pool) {
+        if (!process.env.DATABASE_URL) {
+            throw new Error('DATABASE_URL environment variable is missing');
+        }
+        pool = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: {
+                rejectUnauthorized: false
+            }
+        });
     }
-});
+    return pool;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     setCorsHeaders(req, res);
@@ -50,8 +60,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: passwordValidation.message });
         }
 
+        const db = getDb();
         // Check if user already exists
-        const existingUser = await pool.query(
+        const existingUser = await db.query(
             'SELECT id FROM users WHERE email = $1',
             [email.toLowerCase()]
         );
@@ -64,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const password_hash = await hashPassword(password);
 
         // Create user
-        const result = await pool.query(
+        const result = await db.query(
             `INSERT INTO users (
         email, password_hash, name, qualification, can_prescribe_allopathic,
         phone, registration_number, hospital_name, hospital_address, hospital_phone,
