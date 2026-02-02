@@ -399,13 +399,13 @@ export const processVoiceEdit = async (
     Command: "Add fever to symptoms"
     Output: { 
       "thought_process": "User explicitly asked to add a symptom to subjective.",
-      "actions": [{ "type": "APPEND", "field": "subjective", "value": "Fever" }] 
+      "actions": [{ "type": "APPEND", "field": "subjective", "value": { "text": "Fever" } }] 
     }
     
     Command: "Change diagnosis to Diabetes"
     Output: { 
       "thought_process": "User asked to change the diagnosis. This is an UPDATE to differentialDiagnosis.",
-      "actions": [{ "type": "UPDATE", "field": "differentialDiagnosis", "value": "Diabetes Mellitus" }] 
+      "actions": [{ "type": "UPDATE", "field": "differentialDiagnosis", "value": { "text": "Diabetes Mellitus" } }] 
     }
     
     Command: "Add Paracetamol 500mg twice daily"
@@ -417,7 +417,7 @@ export const processVoiceEdit = async (
     Command: "Edit clinical findings that patient has mild tenderness"
     Output: { 
       "thought_process": "User wants to edit objective findings.",
-      "actions": [{ "type": "UPDATE", "field": "objective", "value": "Mild tenderness present" }] 
+      "actions": [{ "type": "UPDATE", "field": "objective", "value": { "text": "Mild tenderness present" } }] 
     }
     
     Command: "Actually make it 650mg" (Context: last medicine was Paracetamol)
