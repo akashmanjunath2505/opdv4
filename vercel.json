@@ -1,0 +1,18 @@
+{
+    "version": 2,
+    "buildCommand": "npm run build",
+    "devCommand": "npm run dev",
+    "installCommand": "npm install",
+    "framework": "vite",
+    "outputDirectory": "dist",
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api/$1"
+        }
+    ],
+    "env": {
+        "VITE_API_URL": "/api",
+        "DATABASE_URL": "@database_url"
+    }
+}
