@@ -80,7 +80,7 @@ export function validateEmail(email: string): boolean {
 }
 
 // Auth middleware for Vercel serverless functions
-export function vercelAuthMiddleware(req: Request): JWTPayload | null {
+export function vercelAuthMiddleware(req: any): JWTPayload | null {
     const authHeader = req.headers.authorization as string;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

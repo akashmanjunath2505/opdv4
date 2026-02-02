@@ -95,12 +95,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     const userId = userResult.rows[0].id;
                     const status = subscription.status === 'active' ? 'active' : 'inactive';
 
+                    // Cast to any to access current_period_end potentially missing in type
+                    const periodEnd = (subscription as any).current_period_end;
+
                     await pool.query(
                         `UPDATE users 
              SET subscription_status = $1,
                  subscription_end_date = to_timestamp($2)
              WHERE id = $3`,
-                        [status, subscription.current_period_end, userId]
+                        [status, periodEnd, userId]
                     );
                 }
                 break;
@@ -146,7 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     await pool.query(
                         `INSERT INTO payments (user_id, stripe_payment_id, amount, currency, status)
              VALUES ($1, $2, $3, $4, 'succeeded')`,
-                        [userId, invoice.payment_intent, invoice.amount_paid, invoice.currency]
+                        [userId, (invoice as any).payment_intent, invoice.amount_paid, invoice.currency]
                     );
                 }
                 break;
