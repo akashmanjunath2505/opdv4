@@ -163,7 +163,7 @@ const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptio
 
 export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSession, doctorProfile, language: defaultLanguage }) => {
     const [phase, setPhase] = useState<'consent' | 'active' | 'processing' | 'review'>('consent');
-    const [sessionLanguage, setSessionLanguage] = useState("Auto-detect");
+    const [sessionLanguage, setSessionLanguage] = useState(defaultLanguage || "Automatic Language Detection");
     const [transcriptHistory, setTranscriptHistory] = useState<TranscriptEntry[]>([]);
     const [clinicalNote, setClinicalNote] = useState('');
     const [duration, setDuration] = useState(0);
@@ -304,8 +304,8 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 hospital_phone: patient.hospitalPhone
             });
 
-            setSessionId(session.id);
-            console.log('✅ Session created in database:', session.id);
+            setSessionId(session.data.id);
+            console.log('✅ Session created in database:', session.data.id);
 
             setPhase('active');
             setDuration(0);
@@ -554,7 +554,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             </div>
 
             {/* MIDDLE COLUMN: TRANSCRIPT (Independent Space) */}
-            <div className="w-[380px] flex flex-col border-r border-white/5 bg-black/40">
+            <div className={`${phase === 'active' ? 'flex-1' : 'w-[380px]'} flex flex-col border-r border-white/5 bg-black/40 transition-all duration-500`}>
                 <div className="h-16 flex items-center px-6 border-b border-white/5">
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-aivana-accent">Transcript</span>
                 </div>
@@ -586,7 +586,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             </div>
 
             {/* RIGHT PANEL: MAIN EDITOR (Bigger Focus) */}
-            <div className="flex-1 flex flex-col relative bg-aivana-dark">
+            <div className={`${phase === 'active' ? 'w-[450px]' : 'flex-1'} flex flex-col relative bg-aivana-dark transition-all duration-500`}>
                 {/* Header Bar */}
                 <header className="h-16 border-b border-white/5 bg-black/20 px-6 flex items-center justify-between">
                     <div className="flex items-center gap-6">
@@ -620,8 +620,22 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                     </div>
                 </header>
 
+                {/* Active Recording Placeholder */}
+                {phase === 'active' && (
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20 text-center">
+                        <div className="w-24 h-24 mb-6 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
+                            <Icon name="microphone" className="w-10 h-10 text-red-500" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">Recording in Progress</h3>
+                        <p className="text-sm text-gray-500 max-w-xs">
+                            The transcript is expanding to capture the full conversation.
+                            The editor will reappear once the session ends.
+                        </p>
+                    </div>
+                )}
+
                 {/* Main Editor Canvas */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-black/20">
+                <div className={`flex-1 overflow-y-auto p-6 md:p-8 bg-black/20 ${phase === 'active' ? 'hidden' : 'block'}`}>
                     <div className="max-w-4xl mx-auto space-y-8">
 
                         {/* Patient Info Card */}

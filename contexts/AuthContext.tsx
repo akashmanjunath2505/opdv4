@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService, User, RegisterData } from '../services/authService';
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 interface AuthContextType {
     user: User | null;
@@ -17,49 +18,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Initial Load
     useEffect(() => {
-        // Initialize Session
+        let mounted = true;
+
         const initSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                try {
-                    const currentUser = await authService.getCurrentUser();
-                    setUser(currentUser);
-                } catch (err) {
-                    console.error('Failed to load user profile:', err);
+            try {
+                // Get Session from LocalStorage
+                const { data: { session }, error } = await supabase.auth.getSession();
+
+                if (error) {
+                    throw error;
                 }
+
+                if (session) {
+                    // Fetch Profile
+                    const currentUser = await authService.getCurrentUser();
+                    if (mounted) setUser(currentUser);
+                }
+            } catch (err: any) {
+                console.error('Session init error:', err);
+                // Don't toast on page load for auth errors, just stay logged out
+                // But if it's a network error, maybe warn?
+                if (err.message && !err.message.includes('Not authenticated')) {
+                    // toast.error('Failed to restore session');
+                }
+            } finally {
+                if (mounted) setLoading(false);
             }
-            setLoading(false);
         };
 
         initSession();
 
-        // Listen for Auth Changes
+        // Listen for Real-time Auth State Changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth State Change:', event);
+
             if (event === 'SIGNED_IN' && session) {
-                const currentUser = await authService.getCurrentUser();
-                setUser(currentUser);
+                try {
+                    const currentUser = await authService.getCurrentUser();
+                    if (mounted) setUser(currentUser);
+                } catch (err: any) {
+                    console.error('Profile fetch failed:', err);
+                    toast.error('Login successful, but profile could not be loaded.');
+                }
             } else if (event === 'SIGNED_OUT') {
-                setUser(null);
+                if (mounted) setUser(null);
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     const login = async (email: string, password: string) => {
-        const result = await authService.login({ email, password });
-        setUser(result.user);
+        const toastId = toast.loading('Signing in...');
+        try {
+            const result = await authService.login({ email, password });
+            setUser(result.user);
+            toast.success('Welcome back!', { id: toastId });
+        } catch (err: any) {
+            console.error('Login failed:', err);
+            toast.error(err.message || 'Login failed', { id: toastId });
+            throw err; // Re-throw to let component know
+        }
     };
 
     const register = async (data: RegisterData) => {
-        const result = await authService.register(data);
-        setUser(result.user);
+        const toastId = toast.loading('Creating your account...');
+        try {
+            const result = await authService.register(data);
+            setUser(result.user);
+            toast.success('Account created successfully!', { id: toastId });
+        } catch (err: any) {
+            console.error('Registration failed:', err);
+            toast.error(err.message || 'Registration failed', { id: toastId });
+            throw err;
+        }
     };
 
     const logout = () => {
         authService.logout();
         setUser(null);
+        toast.success('Logged out successfully');
     };
 
     const refreshUser = async () => {

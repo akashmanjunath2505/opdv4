@@ -15,6 +15,7 @@ export const AppRouter: React.FC = () => {
     const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
     const [showPricing, setShowPricing] = useState(false);
     const [usageLimitInfo, setUsageLimitInfo] = useState({ casesToday: 0, limit: 10 });
+    const [sessionLanguage, setSessionLanguage] = useState("Automatic Language Detection");
 
     // Loading state
     if (loading) {
@@ -36,7 +37,7 @@ export const AppRouter: React.FC = () => {
         return <LoginPage onSwitchToRegister={() => setShowRegister(true)} />;
     }
 
-    const handleStartSession = async () => {
+    const handleStartSession = async (language: string) => {
         // Check if user has reached limit
         if (user.subscription_tier === 'free' && user.cases_today >= 10) {
             setUsageLimitInfo({ casesToday: user.cases_today, limit: 10 });
@@ -45,6 +46,7 @@ export const AppRouter: React.FC = () => {
         }
 
         // Start session
+        setSessionLanguage(language);
         setInSession(true);
     };
 
@@ -76,7 +78,7 @@ export const AppRouter: React.FC = () => {
             <ScribeSessionView
                 onEndSession={handleEndSession}
                 doctorProfile={doctorProfile}
-                language="English"
+                language={sessionLanguage}
             />
         );
     }

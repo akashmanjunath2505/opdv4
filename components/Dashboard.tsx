@@ -2,12 +2,13 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface DashboardProps {
-    onStartSession: () => void;
+    onStartSession: (language: string) => void;
     onUpgrade?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade }) => {
     const { user, logout } = useAuth();
+    const [selectedLanguage, setSelectedLanguage] = React.useState("Automatic Language Detection");
 
     if (!user) return null;
 
@@ -157,10 +158,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                             </p>
                         </div>
 
+                        <div className="mb-6">
+                            <label className="block text-left text-sm font-medium text-slate-700 mb-2">
+                                Consultation Language
+                            </label>
+                            <select
+                                value={selectedLanguage}
+                                onChange={(e) => setSelectedLanguage(e.target.value)}
+                                className="w-full px-4 py-3 rounded-lg border border-slate-300 text-slate-900 bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all appearance-none cursor-pointer hover:border-blue-400"
+                                style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23000000%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '0.65em auto' }}
+                            >
+                                <option value="Automatic Language Detection">✨ Automatic Language Detection</option>
+                                <option value="English">English</option>
+                                <option value="Hindi">Hindi (हिंदी)</option>
+                                <option value="Bengali">Bengali (বাংলা)</option>
+                                <option value="Marathi">Marathi (मराठी)</option>
+                                <option value="Telugu">Telugu (తెలుగు)</option>
+                                <option value="Tamil">Tamil (தமிழ்)</option>
+                                <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+                                <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+                                <option value="Malayalam">Malayalam (മലയാളം)</option>
+                                <option value="Odia">Odia (ଓଡ଼ିଆ)</option>
+                                <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
+                                <option value="Assamese">Assamese (অসমীয়া)</option>
+                            </select>
+                        </div>
+
                         <button
-                            onClick={onStartSession}
+                            onClick={() => onStartSession(selectedLanguage)}
                             disabled={isFreeTier && casesRemaining === 0}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-8 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-8 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg shadow-blue-900/10"
                         >
                             {isFreeTier && casesRemaining === 0 ? 'Upgrade to Continue' : 'Start Veda Session'}
                         </button>

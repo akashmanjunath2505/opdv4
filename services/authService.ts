@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
-// Auth Service using Supabase Auth
-// Replaces custom backend logic
+// ROBUST AUTH SERVICE
+// Handles Supabase Auth + Public Profile Syncing
 
 export interface User {
     id: string;
@@ -33,7 +34,6 @@ export interface RegisterData {
     hospital_name?: string;
     hospital_address?: string;
     hospital_phone?: string;
-    hospital_logo?: File | null;
 }
 
 export interface LoginData {
@@ -71,7 +71,7 @@ class AuthService {
             subscription_status: 'active',
             cases_today: 0,
             total_cases: 0,
-            password_hash: 'managed_by_supabase' // Placeholder to satisfy schema constraints
+            password_hash: 'managed_by_supabase'
         };
 
         const { error: profileError } = await supabase
@@ -79,12 +79,10 @@ class AuthService {
             .insert(profileData);
 
         if (profileError) {
-            // Rollback auth user if profile creation fails? (Ideal but complex)
             console.error('Profile creation failed:', profileError);
             throw new Error('Failed to create user profile: ' + profileError.message);
         }
 
-        // 3. Return user structure expected by app
         const user: User = {
             ...profileData,
             created_at: new Date().toISOString(),
@@ -103,16 +101,18 @@ class AuthService {
         if (error) throw new Error(error.message);
         if (!authData.user) throw new Error('Login failed');
 
-        // Fetch User Profile
         const user = await this.getCurrentUser();
         return { user, token: authData.session?.access_token || '' };
     }
 
     async getCurrentUser(): Promise<User> {
+        // 1. Get Auth User
         const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
+            throw new Error('Not authenticated');
+        }
 
-        if (!authUser) throw new Error('Not authenticated');
-
+        // 2. Get Public Profile
         const { data: profile, error } = await supabase
             .from('users')
             .select('*')
@@ -120,7 +120,34 @@ class AuthService {
             .single();
 
         if (error || !profile) {
-            throw new Error('User profile not found');
+            // AUTO-HEAL: If profile is missing but Auth exists, try to create basic profile
+            console.warn('User profile missing, attempting to create default profile...');
+
+            const defaultProfile = {
+                id: authUser.id,
+                email: authUser.email || '',
+                name: 'Doctor (Pending Setup)',
+                qualification: 'MBBS',
+                can_prescribe_allopathic: 'yes',
+                password_hash: 'managed_by_supabase', // Required by schema
+                subscription_tier: 'free',
+                subscription_status: 'active'
+            };
+
+            const { error: insertError } = await supabase.from('users').insert(defaultProfile);
+
+            if (insertError) {
+                console.error('Failed to auto-create profile:', insertError);
+                throw new Error('User profile not found and could not be created.');
+            }
+
+            // Return the newly created profile (approximated since we just inserted)
+            return {
+                ...defaultProfile,
+                cases_today: 0,
+                total_cases: 0,
+                created_at: new Date().toISOString()
+            } as User;
         }
 
         return profile as User;
@@ -128,12 +155,25 @@ class AuthService {
 
     async logout() {
         await supabase.auth.signOut();
-        localStorage.removeItem('auth_token'); // Cleanup legacy if exists
+        localStorage.removeItem('auth_token');
+    }
+
+    async loginWithGoogle() {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+
+        if (error) throw new Error(error.message);
+        return data;
     }
 
     isAuthenticated(): boolean {
-        // This is synchronous check, might need async verification
-        return !!localStorage.getItem('sb-zdsohbjczbdktczzzujf-auth-token');
+        // We rely on Supabase state mostly, but can check local storage presence
+        const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+        return !!key;
     }
 }
 
