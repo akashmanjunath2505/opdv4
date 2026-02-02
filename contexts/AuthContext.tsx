@@ -19,106 +19,116 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     // Initial Load
-    useEffect(() => {
-        let mounted = true;
+    // Safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+        if (mounted) setLoading(false);
+    }, 8000);
 
-        const initSession = async () => {
+    const initSession = async () => {
+        try {
+            // Get Session from LocalStorage
+            const { data: { session }, error } = await supabase.auth.getSession();
+
+            if (error) {
+                throw error;
+            }
+
+            if (session) {
+                // Fetch Profile
+                const currentUser = await authService.getCurrentUser();
+                if (mounted) setUser(currentUser);
+            }
+        } catch (err: any) {
+            console.error('Session init error:', err);
+            // Don't toast on page load for auth errors
+        } finally {
+            if (mounted) setLoading(false);
+            clearTimeout(safetyTimeout);
+        }
+    };
+
+    initSession();
+
+    // Listen for Real-time Auth State Changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth State Change:', event);
+
+        if (event === 'SIGNED_IN' && session) {
+            // Determine if we need to fetch profile (avoid double fetch if initSession did it)
+            // But simplified: just fetch it.
             try {
-                // Get Session from LocalStorage
-                const { data: { session }, error } = await supabase.auth.getSession();
-
-                if (error) {
-                    throw error;
-                }
-
-                if (session) {
-                    // Fetch Profile
-                    const currentUser = await authService.getCurrentUser();
-                    if (mounted) setUser(currentUser);
+                const currentUser = await authService.getCurrentUser();
+                if (mounted) {
+                    setUser(currentUser);
+                    setLoading(false); // <--- Ensuring loading is cleared when we know we are signed in
+                    clearTimeout(safetyTimeout);
                 }
             } catch (err: any) {
-                console.error('Session init error:', err);
-                // Don't toast on page load for auth errors, just stay logged out
-                // But if it's a network error, maybe warn?
-                if (err.message && !err.message.includes('Not authenticated')) {
-                    // toast.error('Failed to restore session');
-                }
-            } finally {
-                if (mounted) setLoading(false);
+                console.error('Profile fetch failed:', err);
+                toast.error('Login successful, but profile could not be loaded.');
+                if (mounted) setLoading(false); // Fail gracefully
             }
-        };
-
-        initSession();
-
-        // Listen for Real-time Auth State Changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth State Change:', event);
-
-            if (event === 'SIGNED_IN' && session) {
-                try {
-                    const currentUser = await authService.getCurrentUser();
-                    if (mounted) setUser(currentUser);
-                } catch (err: any) {
-                    console.error('Profile fetch failed:', err);
-                    toast.error('Login successful, but profile could not be loaded.');
-                }
-            } else if (event === 'SIGNED_OUT') {
-                if (mounted) setUser(null);
+        } else if (event === 'SIGNED_OUT') {
+            if (mounted) {
+                setUser(null);
+                setLoading(false);
             }
-        });
-
-        return () => {
-            mounted = false;
-            subscription.unsubscribe();
-        };
-    }, []);
-
-    const login = async (email: string, password: string) => {
-        const toastId = toast.loading('Signing in...');
-        try {
-            const result = await authService.login({ email, password });
-            setUser(result.user);
-            toast.success('Welcome back!', { id: toastId });
-        } catch (err: any) {
-            console.error('Login failed:', err);
-            toast.error(err.message || 'Login failed', { id: toastId });
-            throw err; // Re-throw to let component know
         }
-    };
+    });
 
-    const register = async (data: RegisterData) => {
-        const toastId = toast.loading('Creating your account...');
-        try {
-            const result = await authService.register(data);
-            setUser(result.user);
-            toast.success('Account created successfully!', { id: toastId });
-        } catch (err: any) {
-            console.error('Registration failed:', err);
-            toast.error(err.message || 'Registration failed', { id: toastId });
-            throw err;
-        }
+    return () => {
+        mounted = false;
+        clearTimeout(safetyTimeout);
+        subscription.unsubscribe();
     };
+}, []);
 
-    const logout = () => {
-        authService.logout();
-        setUser(null);
-        toast.success('Logged out successfully');
-    };
+const login = async (email: string, password: string) => {
+    const toastId = toast.loading('Signing in...');
+    try {
+        const result = await authService.login({ email, password });
+        setUser(result.user);
+        toast.success('Welcome back!', { id: toastId });
+    } catch (err: any) {
+        console.error('Login failed:', err);
+        toast.error(err.message || 'Login failed', { id: toastId });
+        throw err; // Re-throw to let component know
+    }
+};
 
-    const refreshUser = async () => {
-        try {
-            const currentUser = await authService.getCurrentUser();
-            setUser(currentUser);
-        } catch (err) {
-            console.error('Failed to refresh user:', err);
-        }
-    };
+const register = async (data: RegisterData) => {
+    const toastId = toast.loading('Creating your account...');
+    try {
+        const result = await authService.register(data);
+        setUser(result.user);
+        toast.success('Account created successfully!', { id: toastId });
+    } catch (err: any) {
+        console.error('Registration failed:', err);
+        toast.error(err.message || 'Registration failed', { id: toastId });
+        throw err;
+    }
+};
 
-    return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
-            {children}
-        </AuthContext.Provider>
-    );
+const logout = () => {
+    authService.logout();
+    setUser(null);
+    toast.success('Logged out successfully');
+};
+
+const refreshUser = async () => {
+    try {
+        const currentUser = await authService.getCurrentUser();
+        setUser(currentUser);
+    } catch (err) {
+        console.error('Failed to refresh user:', err);
+    }
+};
+
+return (
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+        {children}
+    </AuthContext.Provider>
+);
 }
 
 export function useAuth() {
