@@ -470,7 +470,9 @@ export const processVoiceEdit = async (
     const responseText = response.text;
     if (!responseText) return null;
 
-    const result = JSON.parse(responseText);
+    // Robust JSON parsing: Remove potential markdown code blocks
+    const cleanJson = responseText.replace(/```json\n?|```/g, '').trim();
+    const result = JSON.parse(cleanJson);
     console.log('[Voice Edit] AI Actions:', result);
 
     // Apply actions to currentData locally
