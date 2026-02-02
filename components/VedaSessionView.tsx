@@ -33,6 +33,24 @@ const VoiceVisualizer: React.FC<{ isActive: boolean }> = ({ isActive }) => (
     </div>
 );
 
+const BigWaveform: React.FC = () => {
+    return (
+        <div className="w-full h-48 flex items-center justify-center gap-1.5 px-8 opacity-80">
+            {[...Array(40)].map((_, i) => (
+                <div
+                    key={i}
+                    className="w-1.5 bg-red-500 rounded-full animate-big-wave"
+                    style={{
+                        height: '10%',
+                        animationDelay: `${i * 0.05}s`,
+                        animationDuration: `${0.8 + Math.random() * 0.5}s`
+                    }}
+                ></div>
+            ))}
+        </div>
+    );
+};
+
 const stripMarkdown = (text: string): string => {
     if (!text) return "";
     return text.replace(/^[#\s*+-]+/gm, '').replace(/[*_]{1,2}/g, '').trim();
@@ -506,7 +524,9 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         <div className="flex-1 flex bg-aivana-dark overflow-hidden h-screen font-sans">
             <style>{`
                 @keyframes wave { 0%, 100% { height: 20%; opacity: 0.5; } 50% { height: 100%; opacity: 1; } }
+                @keyframes big-wave { 0%, 100% { height: 10px; opacity: 0.3; } 50% { height: 100%; opacity: 1; } }
                 .animate-wave { animation: wave 1s ease-in-out infinite; }
+                .animate-big-wave { animation: big-wave 1s ease-in-out infinite; }
             `}</style>
 
             {/* LEFT SIDEBAR: SESSION INFO */}
@@ -622,15 +642,18 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
                 {/* Active Recording Placeholder */}
                 {phase === 'active' && (
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20 text-center">
-                        <div className="w-24 h-24 mb-6 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
-                            <Icon name="microphone" className="w-10 h-10 text-red-500" />
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20 text-center relative overflow-hidden">
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 transform">
+                            <BigWaveform />
                         </div>
-                        <h3 className="text-xl font-bold text-white mb-2">Recording in Progress</h3>
-                        <p className="text-sm text-gray-500 max-w-xs">
-                            The transcript is expanding to capture the full conversation.
-                            The editor will reappear once the session ends.
-                        </p>
+
+                        <div className="z-10 bg-black/40 backdrop-blur-sm p-4 rounded-2xl border border-white/5 mt-32">
+                            <div className="w-16 h-16 mb-4 rounded-full bg-red-500/10 flex items-center justify-center mx-auto animate-pulse">
+                                <Icon name="microphone" className="w-8 h-8 text-red-500" />
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-2">Recording Active</h3>
+                            <p className="text-sm text-gray-400">Listening...</p>
+                        </div>
                     </div>
                 )}
 
