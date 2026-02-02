@@ -523,9 +523,16 @@ export const processVoiceEdit = async (
           if (action.type === 'UPDATE') {
             (newData as any)[action.field] = textValue;
           } else if (action.type === 'APPEND') {
-            const currentText = (newData as any)[action.field] || '';
-            const separator = currentText.endsWith('.') ? ' ' : ', ';
-            (newData as any)[action.field] = currentText ? `${currentText}${separator}${textValue}` : textValue;
+            let currentText = (newData as any)[action.field] || '';
+
+            // Clean placeholders before appending
+            const placeholders = ["Not specified", "Not specified.", "None identified.", "None identified", "N/A", "N/A."];
+            if (placeholders.some(p => p.toLowerCase() === currentText.trim().toLowerCase())) {
+              currentText = '';
+            }
+
+            const separator = currentText.endsWith('.') || currentText === '' ? ' ' : ', ';
+            (newData as any)[action.field] = currentText ? `${currentText.trim()}${separator}${textValue}` : textValue;
           } else {
             console.warn('[Voice Edit] Warning: Unknown action type for text field:', action.type);
           }
