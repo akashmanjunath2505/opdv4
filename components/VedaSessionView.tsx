@@ -39,34 +39,124 @@ const stripMarkdown = (text: string): string => {
 
 const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptionData: PrescriptionData; isPreview?: boolean }> = ({ patient, prescriptionData, isPreview }) => {
     const containerClass = isPreview
-        ? "w-full bg-white text-black p-8 rounded-xl shadow-lg border border-gray-200"
+        ? "w-full bg-white text-black p-6 rounded-lg shadow-inner overflow-hidden border border-gray-200"
         : "printable-area p-8 bg-white text-black relative";
 
-    // ... (Simplified for brevity, using passed props) ...
-    return <div className={containerClass}>
-        <h1 className="text-xl font-bold uppercase mb-4 text-center border-b pb-2">{patient.hospitalName || "Medical Report"}</h1>
-        <div className="grid grid-cols-2 gap-4 text-xs mb-6">
-            <div><strong>Patient:</strong> {patient.name}</div>
-            <div><strong>Age/Sex:</strong> {patient.age} / {patient.sex}</div>
-            <div><strong>Date:</strong> {patient.date}</div>
-        </div>
-        <div className="space-y-4 text-sm">
-            {prescriptionData.subjective && <div><strong>Chief Complaint:</strong><p>{prescriptionData.subjective}</p></div>}
-            {prescriptionData.objective && <div><strong>Findings:</strong><p>{prescriptionData.objective}</p></div>}
-            {prescriptionData.differentialDiagnosis && <div><strong>Diagnosis:</strong><p>{prescriptionData.differentialDiagnosis}</p></div>}
-            {prescriptionData.medicines.length > 0 && (
-                <div>
-                    <strong>Rx:</strong>
-                    <ul className="list-disc pl-4 mt-1">
-                        {prescriptionData.medicines.map((m, i) => (
-                            <li key={i}>{m.name} {m.dosage} {m.frequency}</li>
-                        ))}
-                    </ul>
+    const baseFontSize = isPreview ? 'text-[10px]' : 'text-[12.5px]';
+    const headerTitleSize = isPreview ? 'text-[15px]' : 'text-[22px]';
+    const metaLabelSize = isPreview ? 'text-[9.5px]' : 'text-[12.5px]';
+
+    return (
+        <div className={containerClass} style={{ fontFamily: 'Arial, Helvetica, "Noto Sans Devanagari", sans-serif' }}>
+            {/* Header Branding */}
+            <div className="flex justify-between items-start mb-1" style={{ breakInside: 'avoid' }}>
+                <div className="flex-1">
+                    <div className={`${headerTitleSize} font-bold leading-tight uppercase`}>Doctors Name</div>
+                    <div className={`${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'} font-normal mt-0.5`}>Qualification</div>
+                    <div className={`${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'} font-normal`}>Reg. No :</div>
                 </div>
-            )}
-            {prescriptionData.advice && <div><strong>Advice:</strong><p>{prescriptionData.advice}</p></div>}
+                <div className="flex-1 text-right">
+                    <div className={`${headerTitleSize} font-bold leading-tight uppercase`}>{patient.hospitalName}</div>
+                    <div className={`${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'} font-normal mt-0.5`}>{patient.hospitalAddress}</div>
+                    <div className={`flex justify-end ${isPreview ? 'gap-4' : 'gap-10'} mt-1 ${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'}`}>
+                        <div><span className="font-bold">Ph:</span> {patient.hospitalPhone}</div>
+                        <div><span className="font-bold">Time:</span> {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="h-0.5 bg-[#8A63D2] w-full mb-5"></div>
+
+            {/* Demographics Grid */}
+            <div className="grid grid-cols-2 border border-gray-300 mb-5 relative" style={{ breakInside: 'avoid' }}>
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-300"></div>
+                <div className={`${metaLabelSize} space-y-3.5 p-3.5`}>
+                    <div className="font-bold">Name/ID - <span className="font-normal ml-1">{patient.name}</span></div>
+                    <div className="font-bold">Age - <span className="font-normal ml-1">{patient.age}</span></div>
+                    <div className="flex justify-between max-w-[95%]">
+                        <div className="font-bold">Sex - <span className="font-normal ml-1">{patient.sex}</span></div>
+                        <div className="font-bold">Mob. No. - <span className="font-normal ml-1">{patient.mobile}</span></div>
+                    </div>
+                </div>
+                <div className={`${metaLabelSize} p-3.5 space-y-3.5`}>
+                    <div className="font-bold">Date: <span className="font-normal ml-1">{patient.date}</span></div>
+                    <div className="font-bold">Weight - <span className="font-normal ml-1">{patient.weight}</span></div>
+                    <div className="flex justify-between">
+                        <div className="font-bold">Height - <span className="font-normal ml-1">{patient.height}</span></div>
+                        <div className="font-bold">B.M.I. - <span className="font-normal ml-1">{patient.bmi}</span></div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Side-by-Side: Chief Complaints & Clinical Findings */}
+            <div className="grid grid-cols-2 border-l border-r border-t border-gray-300 bg-[#F0F7FF]">
+                <div className={`${baseFontSize} p-2 font-bold border-r border-gray-300 uppercase tracking-tighter`}>Chief Complaint</div>
+                <div className={`${baseFontSize} p-2 font-bold uppercase tracking-tighter`}>Clinical Findings</div>
+            </div>
+            <div className={`grid grid-cols-2 border border-gray-300 mb-5`}>
+                <div className={`${baseFontSize} p-4 border-r border-gray-300 whitespace-pre-wrap leading-relaxed min-h-[140px] font-normal`}>
+                    {prescriptionData.subjective}
+                </div>
+                <div className={`${baseFontSize} p-4 whitespace-pre-wrap leading-relaxed min-h-[140px] font-normal`}>
+                    {prescriptionData.objective}
+                </div>
+            </div>
+
+
+            {/* Differential Diagnosis (Full Width) */}
+            <div className="bg-[#FFF0F0] border-l border-r border-t border-gray-300 p-2">
+                <div className={`${baseFontSize} font-bold uppercase tracking-tighter`}>Differential Diagnosis</div>
+            </div>
+            <div className={`border border-gray-300 mb-5 p-4 ${baseFontSize} whitespace-pre-wrap min-h-[60px] font-normal leading-relaxed`}>
+                {[prescriptionData.assessment, prescriptionData.differentialDiagnosis].filter(Boolean).join('\n') || "None identified."}
+            </div>
+
+            {/* Lab Test Results (Full Width) */}
+            <div className="bg-[#FAF5FF] border-l border-r border-t border-gray-300 p-2">
+                <div className={`${baseFontSize} font-bold uppercase tracking-tighter`}>Lab Test Results</div>
+            </div>
+            <div className={`border border-gray-300 mb-5 p-4 ${baseFontSize} whitespace-pre-wrap min-h-[60px] font-normal leading-relaxed`}>
+                {prescriptionData.labResults || "No lab results recorded."}
+            </div>
+
+            {/* Medicine Table */}
+            <div className="mb-5">
+                <div className="grid grid-cols-4 bg-[#D1F7E2] border border-gray-300 font-bold uppercase tracking-tighter">
+                    <div className={`${baseFontSize} p-2 border-r border-gray-300`}>Name</div>
+                    <div className={`${baseFontSize} p-2 border-r border-gray-300 text-center`}>Dosage</div>
+                    <div className={`${baseFontSize} p-2 border-r border-gray-300 text-center`}>Frequency</div>
+                    <div className={`${baseFontSize} p-2 text-center`}>Route</div>
+                </div>
+                <div className="border-l border-r border-b border-gray-300 min-h-[140px]">
+                    {prescriptionData.medicines.map((med, i) => (
+                        <div key={i} className="grid grid-cols-4 border-b border-gray-200 last:border-0 font-normal">
+                            <div className={`${baseFontSize} p-3 border-r border-gray-200`}>{med.name}</div>
+                            <div className={`${baseFontSize} p-3 border-r border-gray-200 text-center`}>{med.dosage}</div>
+                            <div className={`${baseFontSize} p-3 border-r border-gray-200 text-center`}>{med.frequency}</div>
+                            <div className={`${baseFontSize} p-3 text-center`}>{med.route}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Advice (Full Width) */}
+            <div className="flex flex-col flex-grow">
+                <div className="bg-[#FEF9C3] border border-gray-300 p-2">
+                    <div className={`${baseFontSize} font-bold uppercase tracking-tighter`}>Advice / Instructions</div>
+                </div>
+                <div className={`border-l border-r border-b border-gray-300 p-4 h-full ${baseFontSize} whitespace-pre-wrap leading-relaxed font-normal`}>
+                    {prescriptionData.advice || "N/A"}
+                </div>
+            </div>
+
+            {/* Signature Area */}
+            <div className="flex justify-end items-end pt-14" style={{ breakInside: 'avoid' }}>
+                <div className="text-center">
+                    <div className={`border-t border-black ${isPreview ? 'w-32' : 'w-60'} pt-2 font-bold ${baseFontSize} uppercase`}>Doctors Signature</div>
+                </div>
+            </div>
         </div>
-    </div>
+    );
 };
 
 
