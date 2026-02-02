@@ -1,10 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import pg from 'pg';
+import { Pool } from 'pg';
 import { vercelAuthMiddleware } from '../../server/auth';
 import setCorsHeaders from '../../utils/cors';
-
-const { Pool } = pg;
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: '2026-01-28.clover'

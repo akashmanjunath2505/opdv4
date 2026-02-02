@@ -1,9 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pg from 'pg';
+import { Pool } from 'pg';
 import { comparePassword, generateToken, validateEmail } from '../../server/auth';
 import setCorsHeaders from '../../utils/cors';
-
-const { Pool } = pg;
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
