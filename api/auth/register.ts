@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Pool } from 'pg';
+import * as pg from 'pg';
+import type { Pool } from 'pg';
+const { Pool: PoolConstructor } = (pg as any).default || pg;
 import { hashPassword, validatePassword, validateEmail, generateToken } from '../../server/auth';
 import setCorsHeaders from '../../utils/cors';
 
@@ -10,7 +12,7 @@ function getDb() {
         if (!process.env.DATABASE_URL) {
             throw new Error('DATABASE_URL environment variable is missing');
         }
-        pool = new Pool({
+        pool = new PoolConstructor({
             connectionString: process.env.DATABASE_URL,
             ssl: {
                 rejectUnauthorized: false
