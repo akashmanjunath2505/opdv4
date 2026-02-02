@@ -354,7 +354,7 @@ export async function* streamChatResponse(params: {
     knowledgeBase: params.knowledgeBaseProtocols,
   });
 }
-// Enhanced voice edit with natural language understanding
+// Enhanced voice edit with natural language understanding and robust delta updates
 export const processVoiceEdit = async (
   currentData: PrescriptionData,
   command: string,
@@ -364,138 +364,137 @@ export const processVoiceEdit = async (
   const dictionaryContext = JSON.stringify(prescriptionDictionary);
 
   const systemInstruction = `
-    You are an intelligent Medical Scribe Editor with advanced natural language understanding.
+    You are an intelligent Medical Scribe Editor.
     
-    TASK: Interpret the doctor's voice command and update the prescription data accordingly.
+    TASK: Interpret the doctor's voice command and return a list of specific EDIT ACTIONS to apply to the prescription.
     
     CURRENT PRESCRIPTION DATA:
     ${JSON.stringify(currentData, null, 2)}
     
-    DOCTOR PROFILE:
-    ${JSON.stringify(doctorProfile)}
-    
-    DICTIONARY REFERENCE:
-    ${dictionaryContext}
-    
     DOCTOR'S COMMAND:
     "${command}"
     
-    CRITICAL FIELD MAPPING RULES:
+    RETURN FORMAT:
+    Return a JSON object with an "actions" array. Each action must have:
+    - type: "UPDATE" | "APPEND" | "ADD_MEDICINE" | "REMOVE"
+    - field: "subjective" | "objective" | "differentialDiagnosis" | "labResults" | "advice" | "medicines"
+    - value: (string for text fields, object for medicines)
     
-    **FIELD IDENTIFICATION** - Pay close attention to these keywords:
+    RULES:
+    1. **UPDATE**: Replaces the entire content of a text field. Use for "change diagnosis to X".
+    2. **APPEND**: Adds text to the end of a text field. Use for "add fever" (appends "Fever").
+    3. **ADD_MEDICINE**: Adds a new medicine to the 'medicines' array. Value must refer to { name, dosage, frequency, route }.
+    4. **REMOVE**: Removes an item. For text fields, specifying a value usually implies removing that text, but for simplicity, use UPDATE to clear or change text. For medicines, "REMOVE" with a value (drug name) removes that drug.
     
-    1. **subjective** (Chief Complaint) - Update when command mentions:
-       - "symptoms", "complaint", "complaining of", "patient says", "patient has"
-       - Examples: "add fever", "patient has headache", "complaining of pain"
+    FIELD MAPPING:
+    - "clinical findings", "examination" -> "objective"
+    - "diagnosis" -> "differentialDiagnosis"
+    - "symptoms", "complaints" -> "subjective"
     
-    2. **objective** (Clinical Findings) - Update when command mentions:
-       - "clinical findings", "examination", "vitals", "BP", "pulse", "temperature"
-       - "on examination", "findings show", "observed", "physical exam"
-       - Examples: "edit clinical findings that patient was having some issue"
-                   "BP is 120/80", "on examination abdomen is soft"
+    EXAMPLES:
+    Command: "Add fever to symptoms"
+    Output: { "actions": [{ "type": "APPEND", "field": "subjective", "value": "Fever" }] }
     
-    3. **differentialDiagnosis** - Update when command mentions:
-       - "diagnosis", "condition", "disease", "diagnosed with"
-       - Examples: "change diagnosis to diabetes", "diagnosed with hypertension"
+    Command: "Change diagnosis to Diabetes"
+    Output: { "actions": [{ "type": "UPDATE", "field": "differentialDiagnosis", "value": "Diabetes Mellitus" }] }
     
-    4. **labResults** - Update when command mentions:
-       - "lab", "test", "investigation", "results", "CBC", "blood test"
-       - Examples: "add CBC results", "HbA1c is 7.2"
+    Command: "Add Paracetamol 500mg twice daily"
+    Output: { "actions": [{ "type": "ADD_MEDICINE", "field": "medicines", "value": { "name": "Paracetamol", "dosage": "500mg", "frequency": "Twice Daily", "route": "Oral" } }] }
     
-    5. **medicines** - Update when command mentions:
-       - "medicine", "drug", "tablet", "prescription", "give", "prescribe"
-       - "dosage", "frequency", "route"
-       - Examples: "add paracetamol", "make it 500mg", "twice daily"
+    Command: "Edit clinical findings that patient has mild tenderness"
+    Output: { "actions": [{ "type": "UPDATE", "field": "objective", "value": "Mild tenderness present" }] }
     
-    6. **advice** - Update when command mentions:
-       - "advice", "instructions", "follow-up", "diet", "lifestyle"
-       - Examples: "advise bed rest", "follow up in 1 week"
-    
-    INTELLIGENT INTERPRETATION RULES:
-    
-    1. **Explicit Field Mentions**: If the command explicitly mentions a field name, update THAT field.
-       - "edit clinical findings X" → update 'objective' field
-       - "change chief complaint to X" → update 'subjective' field
-       - "update diagnosis to X" → update 'differentialDiagnosis' field
-    
-    2. **Infer from Context**: If no explicit field mentioned, infer from keywords:
-       - "patient has fever" → 'subjective' (symptom)
-       - "BP is 140/90" → 'objective' (vital sign/finding)
-       - "diabetes mellitus" → 'differentialDiagnosis' (condition)
-    
-    3. **Natural Language Patterns**:
-       - "change X to Y" → replace X with Y in appropriate field
-       - "add X" / "also X" / "include X" → append X to appropriate field
-       - "remove X" / "delete X" → remove X from appropriate field
-       - "edit X that Y" → update field X with content Y
-       - "update X" → modify field X
-    
-    4. **Medicine-Specific Intelligence**:
-       - Validate drug names against dictionary
-       - If only dosage/frequency mentioned, apply to last medicine
-       - Smart defaults: route="Oral", frequency="As directed"
-    
-    5. **Multi-field Updates**: Commands can affect multiple fields
-       - "patient has fever, BP is 140/90" → update both subjective AND objective
-    
-    6. **Maintain Language**: Keep output in ${language} script where applicable.
-    
-    7. **Return Format**: Return ONLY the updated JSON. NO explanations.
-    
-    EXAMPLES OF CORRECT FIELD MAPPING:
-    - "edit clinical findings that patient was having some issue" → update 'objective'
-    - "add fever to symptoms" → update 'subjective'
-    - "change diagnosis to hypertension" → update 'differentialDiagnosis'
-    - "BP is 120/80" → update 'objective'
-    - "patient complains of headache" → update 'subjective'
-    - "add paracetamol 500mg" → update 'medicines'
-    - "advise rest for 3 days" → update 'advice'
-    
-    BE PRECISE: Match the command to the correct field based on medical context and keywords.
+    Command: "Actually make it 650mg" (Context: last medicine was Paracetamol)
+    Output: { "actions": [{ "type": "UPDATE_LAST_MEDICINE", "field": "medicines", "value": { "dosage": "650mg" } }] }
   `;
 
   try {
     console.log('[Voice Edit] Processing command:', command);
-    console.log('[Voice Edit] Current data:', currentData);
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
-      contents: `Apply this edit command: ${command}`,
+      contents: `Command: ${command}`,
       config: {
         systemInstruction,
         responseMimeType: "application/json",
-        temperature: 0.1, // Slightly higher for better natural language understanding
+        temperature: 0.1,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            subjective: { type: Type.STRING },
-            objective: { type: Type.STRING },
-            assessment: { type: Type.STRING },
-            differentialDiagnosis: { type: Type.STRING },
-            labResults: { type: Type.STRING },
-            advice: { type: Type.STRING },
-            medicines: {
+            actions: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  name: { type: Type.STRING },
-                  dosage: { type: Type.STRING },
-                  frequency: { type: Type.STRING },
-                  route: { type: Type.STRING },
-                },
-                required: ['name', 'dosage', 'frequency', 'route'],
-              },
-            },
-          },
-          required: ['subjective', 'objective', 'assessment', 'medicines', 'advice'],
-        },
-      },
+                  type: { type: Type.STRING, enum: ["UPDATE", "APPEND", "ADD_MEDICINE", "REMOVE", "UPDATE_LAST_MEDICINE"] },
+                  field: { type: Type.STRING, enum: ["subjective", "objective", "assessment", "differentialDiagnosis", "labResults", "advice", "medicines"] },
+                  value: {
+                    type: Type.OBJECT,
+                    properties: {
+                      // For text fields, value will be a string wrapper or simple string logic handled by prompt
+                      // But for schema strictness we can perform a trick or just use string for text and object for meds.
+                      // To simplify schema, let's make value flexible or stringify it? 
+                      // Easier: Use a generic object structure
+                      text: { type: Type.STRING }, // For text fields
+                      name: { type: Type.STRING }, // For meds
+                      dosage: { type: Type.STRING },
+                      frequency: { type: Type.STRING },
+                      route: { type: Type.STRING }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
 
-    const result = JSON.parse(response.text || 'null') as PrescriptionData;
-    console.log('[Voice Edit] Result:', result);
-    return result;
+    const responseText = response.text;
+    if (!responseText) return null;
+
+    const result = JSON.parse(responseText);
+    console.log('[Voice Edit] AI Actions:', result);
+
+    // Apply actions to currentData locally
+    const newData = { ...currentData }; // Shallow copy
+    newData.medicines = [...currentData.medicines]; // Deep copy array
+
+    if (result.actions && Array.isArray(result.actions)) {
+      for (const action of result.actions) {
+        if (action.field === 'medicines') {
+          if (action.type === 'ADD_MEDICINE') {
+            newData.medicines.push({
+              name: action.value.name || 'Unknown',
+              dosage: action.value.dosage || 'As prescribed',
+              frequency: action.value.frequency || 'As directed',
+              route: action.value.route || 'Oral'
+            });
+          } else if (action.type === 'UPDATE_LAST_MEDICINE') {
+            if (newData.medicines.length > 0) {
+              const lastMed = newData.medicines[newData.medicines.length - 1];
+              newData.medicines[newData.medicines.length - 1] = { ...lastMed, ...action.value };
+            }
+          } else if (action.type === 'REMOVE') {
+            newData.medicines = newData.medicines.filter(m => m.name.toLowerCase() !== action.value.name?.toLowerCase());
+          }
+        } else {
+          // Text fields
+          const textValue = action.value.text || (typeof action.value === 'string' ? action.value : '');
+
+          if (action.type === 'UPDATE') {
+            (newData as any)[action.field] = textValue;
+          } else if (action.type === 'APPEND') {
+            const currentText = (newData as any)[action.field] || '';
+            (newData as any)[action.field] = currentText ? `${currentText}, ${textValue}` : textValue;
+          }
+        }
+      }
+    }
+
+    console.log('[Voice Edit] Updated Data:', newData);
+    return newData;
+
   } catch (error) {
     console.error("Voice edit processing error:", error);
     return null;
