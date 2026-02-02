@@ -364,66 +364,78 @@ export const processVoiceEdit = async (
   const dictionaryContext = JSON.stringify(prescriptionDictionary);
 
   const systemInstruction = `
-    You are an intelligent Medical Scribe Editor.
-    
-    TASK: Interpret the doctor's voice command and return a list of specific EDIT ACTIONS to apply to the prescription.
-    
-    CURRENT PRESCRIPTION DATA:
-    ${JSON.stringify(currentData, null, 2)}
-    
-    DOCTOR'S COMMAND:
-    "${command}"
-    
-    RETURN FORMAT:
-    Return a JSON object with:
-    - thought_process: A brief explanation of your reasoning.
-    - actions: An array of action objects.
+    You are an AI Medical Scribe Editor with expert clinical judgment.
 
-    Each action must have:
-    - type: "UPDATE" | "APPEND" | "ADD_MEDICINE" | "REMOVE"
-    - field: "subjective" | "objective" | "differentialDiagnosis" | "labResults" | "advice" | "medicines"
-    - value: (string for text fields, object for medicines)
-    
-    RULES:
-    1. **UPDATE**: Replaces the entire content of a text field. Use for "change diagnosis to X".
-    2. **APPEND**: Adds text to the end of a text field. Use for "add fever" (appends "Fever").
-    3. **ADD_MEDICINE**: Adds a new medicine to the 'medicines' array. Value must refer to { name, dosage, frequency, route }.
-    4. **REMOVE**: Removes an item. For text fields, specifying a value usually implies removing that text, but for simplicity, use UPDATE to clear or change text. For medicines, "REMOVE" with a value (drug name) removes that drug.
-    
-    FIELD MAPPING:
-    - "clinical findings", "examination" -> "objective"
-    - "diagnosis" -> "differentialDiagnosis"
-    - "symptoms", "complaints" -> "subjective"
-    
-    EXAMPLES:
-    Command: "Add fever to symptoms"
-    Output: { 
-      "thought_process": "User explicitly asked to add a symptom to subjective.",
-      "actions": [{ "type": "APPEND", "field": "subjective", "value": { "text": "Fever" } }] 
+    **GOAL**: Intelligently modify the Patient Prescription Data based on the doctor's verbal commands. You must handle natural language, messy phrasing, and implicit context with high accuracy.
+
+    **CURRENT CONTEXT (Prescription Data)**:
+    ${JSON.stringify(currentData, null, 2)}
+
+    **COMMAND**: "${command}"
+
+    **YOUR REASONING PROCESS**:
+    1. **Analyze Intent**: Does the user want to ADD info, CHANGE info, or REMOVE info?
+    2. **Identify Field**: Map the medical concept to the correct field intelligently.
+       - "Patient complains of..." / "Symptoms" -> \`subjective\`
+       - "On examination..." / "Found..." / "Signs" -> \`objective\`
+       - "Diagnosis is..." / "It's actually..." (Medical Condition) -> \`differentialDiagnosis\`
+       - "Lab shows..." / "Reports..." -> \`labResults\`
+       - "Prescribe..." / "Give..." / "Add drug..." -> \`medicines\`
+       - "Advice..." / "Patient should..." -> \`advice\`
+    3. **Determine Action Type**:
+       - \`APPEND\`: Default for adding new information to text fields. preserving existing notes.
+       - \`UPDATE\`: Use ONLY when the user explicitly wants to *change*, *replace*, or *correct* a specific field (e.g., "Change diagnosis to...", "Correction, he has...").
+       - \`ADD_MEDICINE\`: For new prescriptions.
+       - \`UPDATE_LAST_MEDICINE\`: For corrections to the most recently added medication (e.g., "Make that 500mg").
+       - \`REMOVE\`: When user says "Delete", "Remove", "No, not that".
+
+    **CLINICAL LOGIC RULES**:
+    - **Symptom vs. Diagnosis**: If the doctor says "Patient has Diabetes", that is a **Diagnosis** (\`differentialDiagnosis\`). If they say "Patient has a headache", that is a **Symptom** (\`subjective\`). Use your medical knowledge.
+    - **Implicit Context**: If the command is "Make it 500mg", assume they are talking about the *last added medicine*.
+    - **Formatting**: Ensure your \`value\` output is clean, capitalized, and professional (e.g., "diabetes" -> "Type 2 Diabetes Mellitus" if appropriate context allows, otherwise keep it faithful).
+
+    **OUTPUT FORMAT (JSON)**:
+    {
+      "thought_process": "Brief explanation of why you chose this action.",
+      "actions": [
+        {
+          "type": "UPDATE" | "APPEND" | "ADD_MEDICINE" | "REMOVE" | "UPDATE_LAST_MEDICINE",
+          "field": "subjective" | "objective" | "differentialDiagnosis" | "labResults" | "medicines" | "advice",
+          "value": { "text": "..." } OR { "name": "...", "dosage": "...", ... }
+        }
+      ]
     }
-    
-    Command: "Change diagnosis to Diabetes"
-    Output: { 
-      "thought_process": "User asked to change the diagnosis. This is an UPDATE to differentialDiagnosis.",
-      "actions": [{ "type": "UPDATE", "field": "differentialDiagnosis", "value": { "text": "Diabetes Mellitus" } }] 
+
+    **EXAMPLES**:
+
+    *Input*: "Patient also has a mild fever." (Context: Subjective has text)
+    *Output*: {
+      "thought_process": "Adding a symptom to existing list.",
+      "actions": [{ "type": "APPEND", "field": "subjective", "value": { "text": "Mild fever" } }]
     }
-    
-    Command: "Add Paracetamol 500mg twice daily"
-    Output: { 
-      "thought_process": "User adding a new medicine.",
-      "actions": [{ "type": "ADD_MEDICINE", "field": "medicines", "value": { "name": "Paracetamol", "dosage": "500mg", "frequency": "Twice Daily", "route": "Oral" } }] 
+
+    *Input*: "Actually, change the diagnosis to Viral Pharyngitis."
+    *Output*: {
+      "thought_process": "User explicitly requested a change/replacement of the diagnosis.",
+      "actions": [{ "type": "UPDATE", "field": "differentialDiagnosis", "value": { "text": "Viral Pharyngitis" } }]
     }
-    
-    Command: "Edit clinical findings that patient has mild tenderness"
-    Output: { 
-      "thought_process": "User wants to edit objective findings.",
-      "actions": [{ "type": "UPDATE", "field": "objective", "value": { "text": "Mild tenderness present" } }] 
+
+    *Input*: "Start Amoxicillin 500mg three times a day for 5 days."
+    *Output*: {
+      "thought_process": "Prescribing a new antibiotic.",
+      "actions": [{ "type": "ADD_MEDICINE", "field": "medicines", "value": { "name": "Amoxicillin", "dosage": "500mg", "frequency": "TDS (3 times daily)", "route": "Oral" } }]
     }
-    
-    Command: "Actually make it 650mg" (Context: last medicine was Paracetamol)
-    Output: { 
-      "thought_process": "User correcting the dosage of the last added medicine.",
-      "actions": [{ "type": "UPDATE_LAST_MEDICINE", "field": "medicines", "value": { "dosage": "650mg" } }] 
+
+    *Input*: "No, make that 650mg." (Context: Just added Paracetamol)
+    *Output*: {
+      "thought_process": "Correcting the dosage of the last medicine.",
+      "actions": [{ "type": "UPDATE_LAST_MEDICINE", "field": "medicines", "value": { "dosage": "650mg" } }]
+    }
+
+    *Input*: "Remove the fever finding."
+    *Output*: {
+       "thought_process": "User wants to remove specific text. I will use REMOVE (or UPDATE if it's the only text, but the code handles detailed removal logic best via UPDATE often, but let's stick to Schema actions).",
+       "actions": [{ "type": "REMOVE", "field": "objective", "value": { "name": "fever" } }]
     }
   `;
 
@@ -511,12 +523,12 @@ export const processVoiceEdit = async (
           if (typeof action.value === 'string') {
             textValue = action.value;
           } else if (action.value && typeof action.value === 'object') {
-            textValue = action.value.text || action.value.value || '';
+            textValue = action.value.text || action.value.value || action.value.name || '';
           }
 
           console.log(`[Voice Edit] Text Field Update: Field=${action.field}, Type=${action.type}, Value="${textValue}"`);
 
-          if (!textValue) {
+          if (!textValue && action.type !== 'REMOVE') {
             console.warn('[Voice Edit] Warning: textValue is empty for action:', action);
           }
 
@@ -533,6 +545,18 @@ export const processVoiceEdit = async (
 
             const separator = currentText.endsWith('.') || currentText === '' ? ' ' : ', ';
             (newData as any)[action.field] = currentText ? `${currentText.trim()}${separator}${textValue}` : textValue;
+          } else if (action.type === 'REMOVE') {
+            if (textValue) {
+              const currentText = (newData as any)[action.field] || '';
+              const regex = new RegExp(textValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+              let cleaned = currentText.replace(regex, '');
+              // cleanup punctuation
+              cleaned = cleaned.replace(/,\s*,/g, ', ').replace(/\s\s+/g, ' ');
+              cleaned = cleaned.replace(/^[\s,.]+/, '').replace(/[\s,]+$/, '');
+              (newData as any)[action.field] = cleaned;
+            } else {
+              (newData as any)[action.field] = ''; // Clear if no value
+            }
           } else {
             console.warn('[Voice Edit] Warning: Unknown action type for text field:', action.type);
           }
