@@ -22,19 +22,27 @@ interface ScribeSessionViewProps {
 
 // FIX: Added missing AudioWaveform component to visualize signal acquisition
 // Corrected: Explicitly using React namespace by adding import to resolve 'Cannot find namespace React'
-const AudioWaveform: React.FC = () => (
-    <div className="flex items-center justify-center gap-1 h-8 px-4">
-        {[...Array(8)].map((_, i) => (
-            <div
-                key={i}
-                className="w-1 bg-aivana-accent rounded-full animate-pulse"
-                style={{
-                    height: `${20 + Math.random() * 80}%`,
-                    animationDuration: `${0.6 + Math.random() * 0.4}s`,
-                    animationDelay: `${i * 0.05}s`
-                }}
-            ></div>
-        ))}
+const VoiceVisualizer: React.FC<{ isActive: boolean }> = ({ isActive }) => (
+    <div className="flex items-center justify-center gap-1.5 h-24 px-10 w-full max-w-2xl mx-auto">
+        {[...Array(30)].map((_, i) => {
+            // Create a symmetrical wave pattern
+            const center = 15;
+            const dist = Math.abs(i - center);
+            const baseHeight = Math.max(20, 100 - (dist * 5));
+
+            return (
+                <div
+                    key={i}
+                    className={`w-1.5 rounded-full transition-all duration-300 ${isActive ? 'bg-aivana-accent animate-wave' : 'bg-gray-700'}`}
+                    style={{
+                        height: isActive ? `${Math.max(20, Math.random() * 100)}%` : '4px',
+                        opacity: isActive ? 1 : 0.3,
+                        animationDelay: `${i * 0.05}s`,
+                        animationDuration: '0.8s'
+                    }}
+                ></div>
+            );
+        })}
     </div>
 );
 
@@ -43,7 +51,6 @@ const stripMarkdown = (text: string): string => {
     return text.replace(/^[#\s*+-]+/gm, '').replace(/[*_]{1,2}/g, '').trim();
 };
 
-// Corrected: Explicitly using React namespace by adding import to resolve 'Cannot find namespace React'
 const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptionData: PrescriptionData; isPreview?: boolean }> = ({ patient, prescriptionData, isPreview }) => {
     const containerClass = isPreview
         ? "w-full bg-white text-black p-6 rounded-lg shadow-inner overflow-hidden border border-gray-200"
@@ -166,7 +173,6 @@ const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptio
     );
 };
 
-// Corrected: Explicitly using React namespace by adding import to resolve 'Cannot find namespace React'
 export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSession, doctorProfile, language: defaultLanguage }) => {
     const [phase, setPhase] = useState<'consent' | 'active' | 'processing' | 'review'>('consent');
     const [sessionLanguage, setSessionLanguage] = useState("Auto-detect");
@@ -290,13 +296,13 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         processedSegmentsRef.current = 0;
         pendingSegmentsQueue.current = [];
         await startRecording({
-            segmentDuration: 10000, // Reduced from 45s to 10s for faster real-time diarization
+            segmentDuration: 10000,
             vadThreshold: 0.02,
-            minSegmentDuration: 2000, // Reduced from 5s to 2s for quicker processing
+            minSegmentDuration: 2000,
             onSegment: (blob) => {
                 const idx = pendingSegmentsQueue.current.length;
                 pendingSegmentsQueue.current.push(blob);
-                processSegment(blob, idx); // Fire and forget during session
+                processSegment(blob, idx);
             }
         });
         startListening();
@@ -310,14 +316,14 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         if (finalBlob) {
             const idx = pendingSegmentsQueue.current.length;
             pendingSegmentsQueue.current.push(finalBlob);
-            await processSegment(finalBlob, idx); // Properly await the final segment
+            await processSegment(finalBlob, idx);
         }
 
         // Wait for all segments to process
         let attempts = 0;
         const checkDone = setInterval(async () => {
             const allProcessed = processedSegmentsRef.current >= pendingSegmentsQueue.current.length;
-            const timedOut = attempts > 10; // 5 seconds timeout
+            const timedOut = attempts > 10;
 
             if (allProcessed || timedOut) {
                 clearInterval(checkDone);
@@ -421,9 +427,19 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
     return (
         <div className="flex-1 flex flex-col bg-aivana-dark overflow-hidden">
+            <style>{`
+                @keyframes wave {
+                    0%, 100% { height: 20%; opacity: 0.5; }
+                    50% { height: 100%; opacity: 1; }
+                }
+                .animate-wave {
+                    animation: wave 1s ease-in-out infinite;
+                }
+            `}</style>
+
             <div className="hidden print:block"><PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} /></div>
-            <header className="h-20 border-b border-aivana-light-grey bg-black relative px-8 flex items-center justify-between shadow-lg no-print">
-                {phase === 'active' && <AudioWaveform />}
+
+            <header className="h-20 border-b border-aivana-light-grey bg-black relative px-8 flex items-center justify-between shadow-lg no-print z-20">
                 <div className="flex items-center gap-4 relative z-10">
                     <div className={`p-2 rounded-xl border ${phase === 'active' ? 'bg-red-500/10 border-red-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
                         {phase === 'active' ? <div className="w-5 h-5 rounded-full bg-red-500 animate-pulse"></div> : <Icon name="shieldCheck" className="w-5 h-5 text-green-500" />}
@@ -434,7 +450,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                     </div>
                 </div>
                 <div className="flex gap-4 relative z-10">
-                    {phase === 'active' && <button onClick={handleStopSession} className="px-6 py-2.5 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest">Stop Capture</button>}
+                    {phase === 'active' && <button onClick={handleStopSession} className="px-6 py-2.5 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-500 transition-colors shadow-[0_0_20px_rgba(220,38,38,0.5)]">Stop Capture</button>}
                     <button onClick={onEndSession} className="px-5 py-2.5 rounded-xl border border-white/10 text-[10px] font-black uppercase text-gray-400 hover:text-white transition-all bg-black/50 backdrop-blur-sm">Exit Session</button>
                 </div>
             </header>
@@ -448,43 +464,65 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                     </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-black/10">
-                    {phase === 'active' && transcriptHistory.length === 0 && !interimTranscript && (
-                        <div className="h-full flex flex-col items-center justify-center opacity-10">
-                            <Icon name="microphone" className="w-16 h-16 mb-4" />
-                            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Listening for dialogue...</p>
+                {/* Main Content Area */}
+                {phase === 'active' ? (
+                    <div className="flex-1 flex flex-col relative bg-gradient-to-b from-black to-aivana-dark">
+                        {/* History Overlay (Faded at Top) */}
+                        <div className="h-1/3 overflow-y-auto px-10 pt-10 mask-image-linear-to-b opacity-50 hover:opacity-100 transition-opacity">
+                            {transcriptHistory.map(entry => (
+                                <div key={entry.id} className={`mb-4 text-sm ${entry.speaker === 'Doctor' ? 'text-aivana-accent' : 'text-blue-400'}`}>
+                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-50 mr-2">{entry.speaker}:</span>
+                                    <span className="font-medium text-white/70">{entry.text}</span>
+                                </div>
+                            ))}
+                            <div ref={transcriptEndRef} />
                         </div>
-                    )}
-                    {phase !== 'active' && transcriptHistory.length === 0 && (
-                        <div className="h-full flex flex-col items-center justify-center opacity-10">
-                            <Icon name="microphone" className="w-16 h-16 mb-4" />
-                            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Listening for dialogue...</p>
-                        </div>
-                    )}
-                    {transcriptHistory.map(entry => (
 
-                        <div key={entry.id} className={`flex gap-6 animate-fadeInUp ${entry.speaker === 'Doctor' ? '' : 'flex-row-reverse'}`}>
-                            <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center border ${entry.speaker === 'Doctor' ? 'bg-aivana-accent/20 border-aivana-accent/30 text-aivana-accent' : 'bg-blue-600/20 border-blue-500/30 text-blue-400'}`}>
-                                <Icon name={entry.speaker === 'Doctor' ? 'ai' : 'user'} className="w-5 h-5" />
+                        {/* Active Focused Area (Centered) */}
+                        <div className="flex-1 flex flex-col items-center justify-center p-10 pb-20">
+                            {/* Visualizer */}
+                            <div className="mb-12 w-full">
+                                <VoiceVisualizer isActive={true} />
                             </div>
-                            <div className={`flex flex-col max-w-[80%] ${entry.speaker === 'Doctor' ? '' : 'items-end'}`}>
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-600 mb-1">{entry.speaker}</span>
-                                <div className={`px-5 py-3 rounded-2xl text-[14px] leading-relaxed shadow-md ${entry.speaker === 'Doctor' ? 'bg-aivana-grey text-white rounded-tl-none font-medium' : 'bg-blue-950/20 text-blue-100 rounded-tr-none font-medium'}`}>
-                                    {entry.text}
+
+                            {/* Real-time Text */}
+                            <div className="text-center max-w-3xl animate-fadeInUp">
+                                {interimTranscript ? (
+                                    <p className="text-2xl md:text-3xl font-medium text-white leading-relaxed drop-shadow-2xl">
+                                        "{interimTranscript}"
+                                    </p>
+                                ) : (
+                                    <p className="text-xl text-gray-600 font-light italic tracking-widest animate-pulse">
+                                        LISTENING...
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-black/10">
+                        {transcriptHistory.length === 0 && (
+                            <div className="h-full flex flex-col items-center justify-center opacity-10">
+                                <Icon name="microphone" className="w-16 h-16 mb-4" />
+                                <p className="text-[10px] font-black uppercase tracking-[0.4em]">Ready to Start</p>
+                            </div>
+                        )}
+                        {transcriptHistory.map(entry => (
+                            <div key={entry.id} className={`flex gap-6 animate-fadeInUp ${entry.speaker === 'Doctor' ? '' : 'flex-row-reverse'}`}>
+                                <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center border ${entry.speaker === 'Doctor' ? 'bg-aivana-accent/20 border-aivana-accent/30 text-aivana-accent' : 'bg-blue-600/20 border-blue-500/30 text-blue-400'}`}>
+                                    <Icon name={entry.speaker === 'Doctor' ? 'ai' : 'user'} className="w-5 h-5" />
+                                </div>
+                                <div className={`flex flex-col max-w-[80%] ${entry.speaker === 'Doctor' ? '' : 'items-end'}`}>
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-600 mb-1">{entry.speaker}</span>
+                                    <div className={`px-5 py-3 rounded-2xl text-[14px] leading-relaxed shadow-md ${entry.speaker === 'Doctor' ? 'bg-aivana-grey text-white rounded-tl-none font-medium' : 'bg-blue-950/20 text-blue-100 rounded-tr-none font-medium'}`}>
+                                        {entry.text}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
-                    {interimTranscript && (
-                        <div className="flex justify-center py-4">
-                            <div className="px-4 py-2 bg-white/[0.02] border border-white/5 rounded-full text-[12px] text-gray-600 flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-aivana-accent animate-ping"></div>
-                                <span className="italic">"{interimTranscript}..."</span>
-                            </div>
-                        </div>
-                    )}
-                    <div ref={transcriptEndRef} />
-                </div>
+                        ))}
+                        <div ref={transcriptEndRef} />
+                    </div>
+                )}
 
                 <aside className={`w-[540px] border-l border-white/5 bg-aivana-dark-sider flex flex-col overflow-hidden shadow-2xl transition-all duration-700 ${phase === 'review' ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className="p-5 bg-black/20 border-b border-white/5 grid grid-cols-4 gap-3">
