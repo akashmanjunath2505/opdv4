@@ -78,6 +78,9 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
             return;
         }
 
+        // Prevent multiple instances
+        if (recognitionRef.current) return;
+
         try {
             const recognition = new window.webkitSpeechRecognition();
             recognition.continuous = true;
@@ -109,14 +112,25 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
 
             recognition.onerror = (event: any) => {
                 console.error('Speech recognition error', event.error);
-                // Ignore 'no-speech' errors as they just mean silence
-                if (event.error !== 'no-speech') {
-                    setError(event.error);
+                if (event.error === 'not-allowed') {
+                    setError('Microphone access denied.');
+                    setIsListening(false);
                 }
+                // 'aborted' and 'network' are common, we will try to restart in onend
             };
 
             recognition.onend = () => {
-                setIsListening(false);
+                // Only stop if we explicitly requested it
+                if (recognitionRef.current) {
+                    console.log('Speech recognition ended unexpectedly, restarting...');
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        // unexpected start error
+                    }
+                } else {
+                    setIsListening(false);
+                }
             };
 
             recognitionRef.current = recognition;
@@ -129,9 +143,11 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
     }, [options.lang]);
 
     const stopListening = useCallback(() => {
-        if (recognitionRef.current) {
-            recognitionRef.current.stop();
+        const recognition = recognitionRef.current;
+        if (recognition) {
+            // Clear ref FIRST to signal intentional stop to onend
             recognitionRef.current = null;
+            recognition.stop();
         }
         setIsListening(false);
     }, []);
