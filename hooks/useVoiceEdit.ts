@@ -15,15 +15,17 @@ export const useVoiceEdit = (
     const isActiveRef = useRef(false);
 
     const handleToggleListening = useCallback(() => {
-        if (!isListening) {
+        if (isActiveRef.current) {
+            // Stop
+            isActiveRef.current = false;
+            stopListening();
+        } else {
+            // Start
             resetTranscript();
             isActiveRef.current = true;
             startListening();
-        } else {
-            isActiveRef.current = false;
-            stopListening();
         }
-    }, [isListening, startListening, stopListening, resetTranscript]);
+    }, [startListening, stopListening, resetTranscript]);
 
     useEffect(() => {
         // Trigger processing when listening stops AND we were previously active
@@ -48,11 +50,35 @@ export const useVoiceEdit = (
         }
     }, [isListening, transcript, currentData, doctorProfile, language, onUpdate, resetTranscript]);
 
+    // Force a re-render when we toggle so UI updates immediately
+    const [isActive, setIsActive] = useState(false);
+
+    const handleToggleListeningWithState = useCallback(() => {
+        if (isActiveRef.current) {
+            isActiveRef.current = false;
+            setIsActive(false);
+            stopListening();
+        } else {
+            resetTranscript();
+            isActiveRef.current = true;
+            setIsActive(true);
+            startListening();
+        }
+    }, [startListening, stopListening, resetTranscript]);
+
+    // Sync external listening state just in case, but rely on our explicit toggle for UI intent
+    useEffect(() => {
+        if (!isListening && isActive) {
+            // If underlying stopped but we think we are active, maybe it crashed or stopped cleanly. 
+            // But we handle processing in the other effect when isListening becomes false. 
+        }
+    }, [isListening, isActive]);
+
     return {
-        isListening,
+        isListening: isActive || isListening, // Show as listening if we intend to be, or if physically listening
         isProcessing,
         interimTranscript,
-        toggleVoiceEdit: handleToggleListening,
+        toggleVoiceEdit: handleToggleListeningWithState,
         transcript
     };
 };
