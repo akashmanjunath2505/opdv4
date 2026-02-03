@@ -12,71 +12,79 @@ export const useVoiceEdit = (
 ) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const { isListening, startListening, stopListening, transcript, interimTranscript, resetTranscript } = useSpeechRecognition({ lang: language });
+
+    // UI State: Are we *intending* to listen?
+    const [isActive, setIsActive] = useState(false);
     const isActiveRef = useRef(false);
 
-    const handleToggleListening = useCallback(() => {
-        if (isActiveRef.current) {
-            // Stop
-            isActiveRef.current = false;
-            stopListening();
-        } else {
-            // Start
-            resetTranscript();
-            isActiveRef.current = true;
-            startListening();
-        }
-    }, [startListening, stopListening, resetTranscript]);
-
-    useEffect(() => {
-        // Trigger processing when listening stops AND we were previously active
-        if (!isListening && !isActiveRef.current && transcript.trim()) {
-            const process = async () => {
-                setIsProcessing(true);
-                try {
-                    const updatedData = await processVoiceEdit(currentData, transcript, doctorProfile, language);
-                    if (updatedData) {
-                        onUpdate(updatedData);
-                    }
-                } catch (error) {
-                    console.error("Voice edit failed:", error);
-                } finally {
-                    setIsProcessing(false);
-                    // Don't reset transcript here immediately if we want to show what was captured
-                    // but for this flow it makes sense to reset after processing
-                    resetTranscript();
-                }
-            };
-            process();
-        }
-    }, [isListening, transcript, currentData, doctorProfile, language, onUpdate, resetTranscript]);
-
-    // Force a re-render when we toggle so UI updates immediately
-    const [isActive, setIsActive] = useState(false);
+    // Track if we are in the "finalizing" phase (stopped UI, but waiting for hardware to stop)
+    const isStoppingRef = useRef(false);
 
     const handleToggleListeningWithState = useCallback(() => {
+        // Prevent toggle if we are currently processing or in the middle of stopping
+        if (isProcessing || isStoppingRef.current) return;
+
         if (isActiveRef.current) {
+            // STOP ACTION
+            console.log('[Voice Edit] User clicked Stop');
             isActiveRef.current = false;
             setIsActive(false);
+
+            // Mark as stopping so we don't allow restart until processing is done/started
+            isStoppingRef.current = true;
+
             stopListening();
         } else {
+            // START ACTION
+            console.log('[Voice Edit] User clicked Start');
             resetTranscript();
             isActiveRef.current = true;
             setIsActive(true);
+            isStoppingRef.current = false;
             startListening();
         }
-    }, [startListening, stopListening, resetTranscript]);
+    }, [isProcessing, startListening, stopListening, resetTranscript]);
 
-    // Sync external listening state just in case, but rely on our explicit toggle for UI intent
     useEffect(() => {
-        if (!isListening && isActive) {
-            // If underlying stopped but we think we are active, maybe it crashed or stopped cleanly. 
-            // But we handle processing in the other effect when isListening becomes false. 
+        // Trigger processing when hardware listening stops AND we intended to stop
+        // We check !isActiveRef.current (User pressed stop) and !isListening (Hardware confirmed stop)
+        if (!isListening && !isActiveRef.current && isStoppingRef.current) {
+
+            const currentTranscript = transcript.trim();
+            console.log('[Voice Edit] Hardware stopped. Transcript:', currentTranscript);
+
+            if (currentTranscript) {
+                const process = async () => {
+                    setIsProcessing(true);
+                    try {
+                        const updatedData = await processVoiceEdit(currentData, currentTranscript, doctorProfile, language);
+                        if (updatedData) {
+                            onUpdate(updatedData);
+                        }
+                    } catch (error) {
+                        console.error("Voice edit failed:", error);
+                    } finally {
+                        setIsProcessing(false);
+                        isStoppingRef.current = false; // Reset stopping state
+                        resetTranscript();
+                    }
+                };
+                process();
+            } else {
+                // Empty transcript, just reset
+                console.log('[Voice Edit] Empty transcript, skipping process');
+                isStoppingRef.current = false;
+                resetTranscript();
+            }
         }
-    }, [isListening, isActive]);
+    }, [isListening, transcript, currentData, doctorProfile, language, onUpdate, resetTranscript]);
 
     return {
-        isListening: isActive || isListening, // Show as listening if we intend to be, or if physically listening
-        isProcessing,
+        // UI should reflect user intent (`isActive`) OR strict processing state
+        // We do NOT include `isListening` here to avoid the "lag" that causes double-clicks.
+        // If underlying hardware is still listening but user clicked stop, we show "Processing" or just "Active=False"
+        isListening: isActive,
+        isProcessing: isProcessing || (isStoppingRef.current && !isActive), // Show processing if we are stopping or actually processing
         interimTranscript,
         toggleVoiceEdit: handleToggleListeningWithState,
         transcript
