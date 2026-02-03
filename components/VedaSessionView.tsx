@@ -321,6 +321,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             console.log('✅ Session created in database:', session.data.id);
 
             setPhase('active');
+            setMobileTab('session'); // Auto-switch to Live tab on start
             setDuration(0);
             setTranscriptHistory([]);
             transcriptHistoryRef.current = [];
@@ -343,6 +344,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             console.error('Failed to create session:', error);
             // Continue anyway with local-only mode
             setPhase('active');
+            setMobileTab('session'); // Auto-switch to Live tab on start (fallback)
             setDuration(0);
             setTranscriptHistory([]);
             transcriptHistoryRef.current = [];
@@ -367,6 +369,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const handleStopSession = useCallback(async () => {
         stopListening();
         setPhase('processing');
+        setMobileTab('editor'); // Auto-switch to Rx tab on stop to show results immediately
         const finalBlob = await stopRecording();
         if (finalBlob) {
             const idx = pendingSegmentsQueue.current.length;
