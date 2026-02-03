@@ -482,168 +482,165 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
     // ... existing effects ...
 
-    // ...
-
-    {/* RIGHT PANEL: MAIN EDITOR (Bigger Focus) */ }
-    <div className={`${phase === 'active' || isRecording ? 'w-[450px]' : 'flex-1'} flex flex-col relative bg-aivana-dark transition-all duration-500`}>
-        {/* Header Bar */}
-        <header className="h-16 border-b border-white/5 bg-black/20 px-4 flex items-center justify-between">
-            <div className={`flex items-center gap-${phase === 'active' || isRecording ? '2' : '6'}`}>
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${phase === 'active' || isRecording ? 'bg-red-500/10 border-red-500/30 text-red-500' : 'bg-green-500/10 border-green-500 text-green-500'}`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${phase === 'active' || isRecording ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
-                    {phase === 'active' || isRecording ? 'REC' : 'Standby'}
-                </div>
+    { phase === 'active' || isRecording ? 'REC' : 'Standby' }
+                </div >
                 <span className="text-lg font-medium text-white tabular-nums">{formatTime(duration)}</span>
                 <VoiceVisualizer isActive={phase === 'active' || isRecording} />
-            </div>
+            </div >
 
-            <div className="flex items-center gap-2">
-                {isVoiceEditing && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-lg animate-fadeIn max-w-[300px] overflow-hidden">
-                        <Icon name="microphone" className="w-3 h-3 text-purple-400 animate-pulse flex-shrink-0" />
-                        <span className="text-xs text-purple-200 truncate">
-                            {voiceEditInterim || "Listening..."}
-                        </span>
-                    </div>
-                )}
-                {/* Hide tools during active recording to save space and reduce distraction */}
-                {phase !== 'active' && !isRecording && (
-                    <>
-                        <button onClick={toggleVoiceEdit} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}>
-                            <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-4 h-4 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
-                            <span className="hidden lg:inline">Voice Edit</span>
-                        </button>
-                        <button onClick={() => setShowPdfPreview(!showPdfPreview)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all">
-                            <Icon name="document-text" className="w-4 h-4" />
-                            <span className="hidden lg:inline">PDF</span>
-                        </button>
-                    </>
-                )}
-
-                {(phase === 'active' || isRecording) && (
-                    <button onClick={handleStopSession} className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95 whitespace-nowrap">
-                        Stop Session
-                    </button>
-                )}
-                <button onClick={onEndSession} className="p-2 text-gray-500 hover:text-white transition-colors"><Icon name="x" className="w-5 h-5" /></button>
-            </div>
-        </header>
-
-        {/* Active Recording Placeholder */}
-        {(phase === 'active' || isRecording) && (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20 text-center">
-                <div className="w-20 h-20 mb-6 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
-                    <Icon name="microphone" className="w-8 h-8 text-red-500" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2">Recording in Progress</h3>
-                <p className="text-sm text-gray-500 max-w-[200px]">
-                    Live transcription is active in the expanded center panel.
-                </p>
+    <div className="flex items-center gap-2">
+        {isVoiceEditing && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-lg animate-fadeIn max-w-[300px] overflow-hidden">
+                <Icon name="microphone" className="w-3 h-3 text-purple-400 animate-pulse flex-shrink-0" />
+                <span className="text-xs text-purple-200 truncate">
+                    {voiceEditInterim || "Listening..."}
+                </span>
             </div>
         )}
+        {/* Hide tools during active recording to save space and reduce distraction */}
+        {phase !== 'active' && !isRecording && (
+            <>
+                <button onClick={toggleVoiceEdit} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'}`}>
+                    <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-4 h-4 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
+                    <span className="hidden lg:inline">Voice Edit</span>
+                </button>
+                <button onClick={() => setShowPdfPreview(!showPdfPreview)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all">
+                    <Icon name="document-text" className="w-4 h-4" />
+                    <span className="hidden lg:inline">PDF</span>
+                </button>
+            </>
+        )}
 
-        {/* Main Editor Canvas */}
-        <div className={`flex-1 overflow-y-auto p-6 md:p-8 bg-black/20 ${phase === 'active' ? 'hidden' : 'block'}`}>
-            <div className="max-w-4xl mx-auto space-y-8">
+        {(phase === 'active' || isRecording) && (
+            <button onClick={handleStopSession} className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95 whitespace-nowrap">
+                Stop Session
+            </button>
+        )}
+        <button onClick={onEndSession} className="p-2 text-gray-500 hover:text-white transition-colors"><Icon name="x" className="w-5 h-5" /></button>
+    </div>
+        </header >
 
-                {/* Patient Info Card */}
-                <div className="p-5 rounded-2xl bg-[#0f1014] border border-white/5 grid grid-cols-4 gap-6 shadow-sm">
-                    <div className="col-span-2 space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-gray-600 tracking-wider">Patient Name</label>
-                        <input value={patient.name} onChange={e => setPatient({ ...patient, name: e.target.value })} className="w-full bg-transparent text-lg font-medium text-white placeholder-gray-700 outline-none border-b border-transparent focus:border-aivana-accent transition-colors" placeholder="Enter Name..." />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-gray-600 tracking-wider">Age</label>
-                        <input value={patient.age} onChange={e => setPatient({ ...patient, age: e.target.value })} className="w-full bg-transparent text-white outline-none" placeholder="--" />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-gray-600 tracking-wider">Sex</label>
-                        <select value={patient.sex} onChange={e => setPatient({ ...patient, sex: e.target.value })} className="w-full bg-transparent text-white outline-none appearance-none"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select>
-                    </div>
-                </div>
+    {/* Active Recording Placeholder */ }
+{
+    (phase === 'active' || isRecording) && (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20 text-center">
+            <div className="w-20 h-20 mb-6 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
+                <Icon name="microphone" className="w-8 h-8 text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Recording in Progress</h3>
+            <p className="text-sm text-gray-500 max-w-[200px]">
+                Live transcription is active in the expanded center panel.
+            </p>
+        </div>
+    )
+}
 
-                {/* Editor Grid */}
-                <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Chief Complaint</label>
-                        <textarea value={prescriptionData.subjective} onChange={e => setPrescriptionData({ ...prescriptionData, subjective: e.target.value })} className="w-full h-32 bg-[#0f1014] border border-white/5 rounded-xl p-4 text-white text-sm outline-none focus:border-aivana-accent focus:ring-1 focus:ring-aivana-accent transition-all resize-none" placeholder="Patient's primary complaints..." />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Clinical Findings</label>
-                        <textarea value={prescriptionData.objective} onChange={e => setPrescriptionData({ ...prescriptionData, objective: e.target.value })} className="w-full h-32 bg-[#0f1014] border border-white/5 rounded-xl p-4 text-white text-sm outline-none focus:border-aivana-accent focus:ring-1 focus:ring-aivana-accent transition-all resize-none" placeholder="Observations found..." />
-                    </div>
-                </div>
+{/* Main Editor Canvas */ }
+<div className={`flex-1 overflow-y-auto p-6 md:p-8 bg-black/20 ${phase === 'active' ? 'hidden' : 'block'}`}>
+    <div className="max-w-4xl mx-auto space-y-8">
 
-                <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Diagnosis</label>
-                    <input value={prescriptionData.differentialDiagnosis} onChange={e => setPrescriptionData({ ...prescriptionData, differentialDiagnosis: e.target.value })} className="w-full bg-[#0f1014] border border-white/5 rounded-xl p-4 text-white text-lg font-medium outline-none focus:border-aivana-accent transition-all" placeholder="Enter Diagnosis..." />
-                </div>
-
-                {/* Medicines */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Medicines</label>
-                        <button onClick={() => setPrescriptionData({ ...prescriptionData, medicines: [...prescriptionData.medicines, { name: '', dosage: '', frequency: '', route: '' }] })} className="text-[9px] font-bold uppercase bg-aivana-accent/10 text-aivana-accent px-3 py-1.5 rounded-lg hover:bg-aivana-accent/20 transition-colors">+ Add Drug</button>
-                    </div>
-                    <div className="grid gap-3">
-                        {prescriptionData.medicines.map((med, i) => (
-                            <div key={i} className="grid grid-cols-12 gap-2 bg-[#0f1014] p-2 rounded-lg border border-white/5 items-center">
-                                <input value={med.name} onChange={e => { const m = [...prescriptionData.medicines]; m[i].name = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="col-span-4 bg-transparent text-white text-sm border-b border-white/5 focus:border-aivana-accent px-2 outline-none" placeholder="Drug Name" />
-                                <input value={med.dosage} onChange={e => { const m = [...prescriptionData.medicines]; m[i].dosage = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="col-span-3 bg-transparent text-white text-sm border-b border-white/5 focus:border-aivana-accent px-2 outline-none" placeholder="Dosage" />
-                                <input value={med.frequency} onChange={e => { const m = [...prescriptionData.medicines]; m[i].frequency = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="col-span-3 bg-transparent text-white text-sm border-b border-white/5 focus:border-aivana-accent px-2 outline-none" placeholder="Freq" />
-                                <div className="col-span-2 flex items-center gap-1">
-                                    <input value={med.route} onChange={e => { const m = [...prescriptionData.medicines]; m[i].route = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="w-full bg-transparent text-white text-sm border-b border-white/5 focus:border-aivana-accent px-2 outline-none" placeholder="Route" />
-                                    <button onClick={() => { const m = prescriptionData.medicines.filter((_, idx) => idx !== i); setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="text-red-500 hover:text-red-400 p-1 rounded">×</button>
-                                </div>
-                            </div>
-                        ))}
-                        {prescriptionData.medicines.length === 0 && <div className="text-center p-6 border border-dashed border-white/10 rounded-xl text-gray-700 text-xs">No medicines prescribed via voice yet.</div>}
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Advice</label>
-                    <textarea value={prescriptionData.advice} onChange={e => setPrescriptionData({ ...prescriptionData, advice: e.target.value })} className="w-full h-24 bg-[#0f1014] border border-white/5 rounded-xl p-4 text-white text-sm outline-none focus:border-aivana-accent focus:ring-1 focus:ring-aivana-accent transition-all resize-none" placeholder="Instructions for patient..." />
-                </div>
-
-
+        {/* Patient Info Card */}
+        <div className="p-5 rounded-2xl bg-[#0f1014] border border-white/5 grid grid-cols-4 gap-6 shadow-sm">
+            <div className="col-span-2 space-y-1">
+                <label className="text-[9px] uppercase font-bold text-gray-600 tracking-wider">Patient Name</label>
+                <input value={patient.name} onChange={e => setPatient({ ...patient, name: e.target.value })} className="w-full bg-transparent text-lg font-medium text-white placeholder-gray-700 outline-none border-b border-transparent focus:border-aivana-accent transition-colors" placeholder="Enter Name..." />
+            </div>
+            <div className="space-y-1">
+                <label className="text-[9px] uppercase font-bold text-gray-600 tracking-wider">Age</label>
+                <input value={patient.age} onChange={e => setPatient({ ...patient, age: e.target.value })} className="w-full bg-transparent text-white outline-none" placeholder="--" />
+            </div>
+            <div className="space-y-1">
+                <label className="text-[9px] uppercase font-bold text-gray-600 tracking-wider">Sex</label>
+                <select value={patient.sex} onChange={e => setPatient({ ...patient, sex: e.target.value })} className="w-full bg-transparent text-white outline-none appearance-none"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select>
             </div>
         </div>
 
-        {/* Processing Overlay */}
-        {phase === 'processing' && (
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center z-50">
-                <div className="w-16 h-16 border-t-2 border-aivana-accent rounded-full animate-spin mb-4"></div>
-                <h2 className="text-2xl font-bold text-white tracking-widest uppercase">Processing Session</h2>
+        {/* Editor Grid */}
+        <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Chief Complaint</label>
+                <textarea value={prescriptionData.subjective} onChange={e => setPrescriptionData({ ...prescriptionData, subjective: e.target.value })} className="w-full h-32 bg-[#0f1014] border border-white/5 rounded-xl p-4 text-white text-sm outline-none focus:border-aivana-accent focus:ring-1 focus:ring-aivana-accent transition-all resize-none" placeholder="Patient's primary complaints..." />
             </div>
-        )}
+            <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Clinical Findings</label>
+                <textarea value={prescriptionData.objective} onChange={e => setPrescriptionData({ ...prescriptionData, objective: e.target.value })} className="w-full h-32 bg-[#0f1014] border border-white/5 rounded-xl p-4 text-white text-sm outline-none focus:border-aivana-accent focus:ring-1 focus:ring-aivana-accent transition-all resize-none" placeholder="Observations found..." />
+            </div>
+        </div>
 
-        {/* PDF Preview Modal */}
-        {showPdfPreview && (
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-8" onClick={() => setShowPdfPreview(false)}>
-                <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                    <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
-                        <h3 className="text-lg font-bold text-gray-900">Prescription Preview</h3>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => window.print()}
-                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
-                            >
-                                <Icon name="download" className="w-4 h-4" />
-                                <span>Download PDF</span>
-                            </button>
-                            <button onClick={() => setShowPdfPreview(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <Icon name="close" className="w-5 h-5 text-gray-600" />
-                            </button>
+        <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Diagnosis</label>
+            <input value={prescriptionData.differentialDiagnosis} onChange={e => setPrescriptionData({ ...prescriptionData, differentialDiagnosis: e.target.value })} className="w-full bg-[#0f1014] border border-white/5 rounded-xl p-4 text-white text-lg font-medium outline-none focus:border-aivana-accent transition-all" placeholder="Enter Diagnosis..." />
+        </div>
+
+        {/* Medicines */}
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Medicines</label>
+                <button onClick={() => setPrescriptionData({ ...prescriptionData, medicines: [...prescriptionData.medicines, { name: '', dosage: '', frequency: '', route: '' }] })} className="text-[9px] font-bold uppercase bg-aivana-accent/10 text-aivana-accent px-3 py-1.5 rounded-lg hover:bg-aivana-accent/20 transition-colors">+ Add Drug</button>
+            </div>
+            <div className="grid gap-3">
+                {prescriptionData.medicines.map((med, i) => (
+                    <div key={i} className="grid grid-cols-12 gap-2 bg-[#0f1014] p-2 rounded-lg border border-white/5 items-center">
+                        <input value={med.name} onChange={e => { const m = [...prescriptionData.medicines]; m[i].name = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="col-span-4 bg-transparent text-white text-sm border-b border-white/5 focus:border-aivana-accent px-2 outline-none" placeholder="Drug Name" />
+                        <input value={med.dosage} onChange={e => { const m = [...prescriptionData.medicines]; m[i].dosage = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="col-span-3 bg-transparent text-white text-sm border-b border-white/5 focus:border-aivana-accent px-2 outline-none" placeholder="Dosage" />
+                        <input value={med.frequency} onChange={e => { const m = [...prescriptionData.medicines]; m[i].frequency = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="col-span-3 bg-transparent text-white text-sm border-b border-white/5 focus:border-aivana-accent px-2 outline-none" placeholder="Freq" />
+                        <div className="col-span-2 flex items-center gap-1">
+                            <input value={med.route} onChange={e => { const m = [...prescriptionData.medicines]; m[i].route = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="w-full bg-transparent text-white text-sm border-b border-white/5 focus:border-aivana-accent px-2 outline-none" placeholder="Route" />
+                            <button onClick={() => { const m = prescriptionData.medicines.filter((_, idx) => idx !== i); setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="text-red-500 hover:text-red-400 p-1 rounded">×</button>
                         </div>
                     </div>
-                    <div className="p-6">
-                        <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview />
+                ))}
+                {prescriptionData.medicines.length === 0 && <div className="text-center p-6 border border-dashed border-white/10 rounded-xl text-gray-700 text-xs">No medicines prescribed via voice yet.</div>}
+            </div>
+        </div>
+
+        <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Advice</label>
+            <textarea value={prescriptionData.advice} onChange={e => setPrescriptionData({ ...prescriptionData, advice: e.target.value })} className="w-full h-24 bg-[#0f1014] border border-white/5 rounded-xl p-4 text-white text-sm outline-none focus:border-aivana-accent focus:ring-1 focus:ring-aivana-accent transition-all resize-none" placeholder="Instructions for patient..." />
+        </div>
+
+
+    </div>
+</div>
+
+{/* Processing Overlay */ }
+{
+    phase === 'processing' && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center z-50">
+            <div className="w-16 h-16 border-t-2 border-aivana-accent rounded-full animate-spin mb-4"></div>
+            <h2 className="text-2xl font-bold text-white tracking-widest uppercase">Processing Session</h2>
+        </div>
+    )
+}
+
+{/* PDF Preview Modal */ }
+{
+    showPdfPreview && (
+        <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-8" onClick={() => setShowPdfPreview(false)}>
+            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+                    <h3 className="text-lg font-bold text-gray-900">Prescription Preview</h3>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => window.print()}
+                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                        >
+                            <Icon name="download" className="w-4 h-4" />
+                            <span>Download PDF</span>
+                        </button>
+                        <button onClick={() => setShowPdfPreview(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <Icon name="close" className="w-5 h-5 text-gray-600" />
+                        </button>
                     </div>
                 </div>
+                <div className="p-6">
+                    <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview />
+                </div>
             </div>
-        )}
-    </div>
+        </div>
+    )
+}
+    </div >
         </div >
     );
 };
