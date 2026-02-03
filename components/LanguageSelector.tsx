@@ -71,8 +71,8 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ value, onCha
                                         setSearchQuery('');
                                     }}
                                     className={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${value === lang.name
-                                            ? 'bg-blue-50 text-blue-700'
-                                            : 'hover:bg-slate-50 text-slate-700'
+                                        ? 'bg-blue-50 text-blue-700'
+                                        : 'hover:bg-slate-50 text-slate-700'
                                         }`}
                                 >
                                     <span className="text-lg w-6 text-center">{lang.flag}</span>
