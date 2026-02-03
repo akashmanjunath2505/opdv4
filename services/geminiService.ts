@@ -493,12 +493,28 @@ export const processVoiceEdit = async (
     });
 
     const responseText = response.text;
+    console.log('[Voice Edit] Raw Response:', responseText);
+
     if (!responseText) return null;
 
-    // Robust JSON parsing: Remove potential markdown code blocks
-    const cleanJson = responseText.replace(/```json\n?|```/g, '').trim();
-    const result = JSON.parse(cleanJson);
-    console.log('[Voice Edit] AI Actions:', result);
+    // Robust JSON parsing
+    let cleanJson = responseText.replace(/```json\n?|```/g, '').trim();
+    // If it starts with non-json, try to find the first { and last }
+    const firstBrace = cleanJson.indexOf('{');
+    const lastBrace = cleanJson.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
+    }
+
+    let result;
+    try {
+      result = JSON.parse(cleanJson);
+    } catch (e) {
+      console.error("Failed to parse Voice Edit JSON:", e, cleanJson);
+      return null;
+    }
+
+    console.log('[Voice Edit] Parsed Result:', result);
 
     // Apply actions to currentData locally
     const newData = { ...currentData }; // Shallow copy
@@ -538,6 +554,9 @@ export const processVoiceEdit = async (
             textValue = action.value.text || action.value.value || action.value.name || '';
           }
 
+          // Ensure we have a string
+          textValue = String(textValue || '');
+
           console.log(`[Voice Edit] Text Field Update: Field=${action.field}, Type=${action.type}, Value="${textValue}"`);
 
           if (!textValue && action.type !== 'REMOVE') {
@@ -560,7 +579,9 @@ export const processVoiceEdit = async (
           } else if (action.type === 'REMOVE') {
             if (textValue) {
               const currentText = (newData as any)[action.field] || '';
-              const regex = new RegExp(textValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+              // Escape regex special characters
+              const escapedText = textValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const regex = new RegExp(escapedText, 'gi');
               let cleaned = currentText.replace(regex, '');
               // cleanup punctuation
               cleaned = cleaned.replace(/,\s*,/g, ', ').replace(/\s\s+/g, ' ');
