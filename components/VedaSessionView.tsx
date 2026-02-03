@@ -201,7 +201,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const transcriptEndRef = useRef<HTMLDivElement>(null);
 
     const { isRecording, startRecording, stopRecording } = useAudioRecorder();
-    const { startListening, stopListening, interimTranscript, resetTranscript } = useSpeechRecognition({ lang: sessionLanguage });
+    const { startListening, stopListening, interimTranscript, transcript, resetTranscript } = useSpeechRecognition({ lang: sessionLanguage });
 
     // Background Generation Hook
     const { liveNote, isGenerating: isGeneratingBackground } = useLiveScribe(
@@ -559,12 +559,14 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-aivana-accent">Transcript</span>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                    {transcriptHistory.length === 0 && (
+                    {transcriptHistory.length === 0 && !transcript && !interimTranscript && (
                         <div className="flex flex-col items-center justify-center h-40 opacity-20">
                             <Icon name="message" className="w-8 h-8 mb-2" />
                             <p className="text-[10px] uppercase tracking-widest">No Speech Detected</p>
                         </div>
                     )}
+
+                    {/* Backend History */}
                     {transcriptHistory.map(entry => (
                         <div key={entry.id} className={`max-w-[90%] ${entry.speaker === 'Doctor' ? 'self-end ml-auto' : 'self-start mr-auto'}`}>
                             <div className={`text-[9px] uppercase font-bold mb-1.5 ${entry.speaker === 'Doctor' ? 'text-right text-aivana-accent' : 'text-left text-gray-500'}`}>{entry.speaker}</div>
@@ -576,6 +578,17 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                             </div>
                         </div>
                     ))}
+
+                    {/* Local Real-time Transcript (Showcase) */}
+                    {transcript && (
+                        <div className="max-w-[90%] self-end ml-auto">
+                            <div className="text-[9px] uppercase font-bold mb-1.5 text-right text-green-400">Live Stream</div>
+                            <div className="p-4 rounded-2xl text-xs leading-relaxed bg-green-500/10 border border-green-500/20 text-green-100 rounded-tr-none animate-fadeIn">
+                                {transcript}
+                            </div>
+                        </div>
+                    )}
+
                     <div ref={transcriptEndRef} />
                     {interimTranscript && (
                         <div className="p-4 bg-aivana-accent/5 border border-aivana-accent/10 rounded-xl text-white/70 text-sm animate-pulse">
