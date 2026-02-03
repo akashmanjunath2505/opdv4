@@ -5,6 +5,7 @@ import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useLiveScribe } from '../hooks/useLiveScribe';
 import { useVoiceEdit } from '../hooks/useVoiceEdit';
+import { RealTimeWaveform } from './RealTimeWaveform';
 import { processAudioSegment, generateClinicalNote } from '../services/geminiService';
 import { renderMarkdownToHTML } from '../utils/markdownRenderer';
 import { apiService } from '../services/apiService';
@@ -14,24 +15,6 @@ interface ScribeSessionViewProps {
     doctorProfile: DoctorProfile;
     language: string;
 }
-
-// Visualizer Component
-const VoiceVisualizer: React.FC<{ isActive: boolean }> = ({ isActive }) => (
-    <div className="flex items-center gap-1 h-12 px-4">
-        {[...Array(15)].map((_, i) => (
-            <div
-                key={i}
-                className={`w-1 rounded-full transition-all duration-300 ${isActive ? 'bg-aivana-accent animate-wave' : 'bg-gray-600'}`}
-                style={{
-                    height: isActive ? `${Math.max(20, Math.random() * 100)}%` : '4px',
-                    opacity: isActive ? 1 : 0.4,
-                    animationDelay: `${i * 0.05}s`,
-                    animationDuration: '0.8s'
-                }}
-            ></div>
-        ))}
-    </div>
-);
 
 const stripMarkdown = (text: string): string => {
     if (!text) return "";
@@ -200,7 +183,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const transcriptEndRef = useRef<HTMLDivElement>(null);
 
-    const { isRecording, startRecording, stopRecording } = useAudioRecorder();
+    const { isRecording, startRecording, stopRecording, currentStream } = useAudioRecorder();
     const { startListening, stopListening, interimTranscript, transcript, resetTranscript, isListening } = useSpeechRecognition({ lang: sessionLanguage });
 
     // Background Generation Hook
@@ -608,7 +591,9 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                             {phase === 'active' ? 'REC' : 'Standby'}
                         </div>
                         <span className="text-lg font-medium text-white tabular-nums">{formatTime(duration)}</span>
-                        <VoiceVisualizer isActive={phase === 'active'} />
+                        <div className="h-12 w-48 mx-4">
+                            <RealTimeWaveform stream={currentStream} isRecording={phase === 'active'} barColor={phase === 'active' ? '#ef4444' : '#22c55e'} />
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2">

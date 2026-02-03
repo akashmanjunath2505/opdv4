@@ -167,5 +167,6 @@ export const useAudioRecorder = () => {
         }
     }, []);
 
-    return { isRecording, isPaused, startRecording, stopRecording, pauseRecording, resumeRecording, error };
+    return { isRecording, isPaused, startRecording, stopRecording, pauseRecording, resumeRecording, error, currentStream: mediaRecorderRef.current?.stream ?? null };
+
 };
