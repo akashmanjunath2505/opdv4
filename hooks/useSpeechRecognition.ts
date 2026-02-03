@@ -2,8 +2,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
 
-// FIX: Updated to the correct native audio preview model name
-const MODEL_NAME = 'gemini-2.5-flash-native-audio-preview-12-2025';
+// Standard model for high-quality audio streaming
+const MODEL_NAME = 'gemini-2.0-flash-exp';
 
 declare global {
     interface Window {
@@ -48,122 +48,240 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
     const [transcript, setTranscript] = useState('');
     const [interimTranscript, setInterimTranscript] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [stream, setStream] = useState<MediaStream | null>(null);
 
-    // Ref to hold the recognition instance
-    const recognitionRef = useRef<any>(null);
+    const supported = true;
 
-    // Helper to map language names to BCP 47 tags
-    const getLangCode = (langName?: string) => {
-        const map: Record<string, string> = {
-            'English': 'en-IN',
-            'Hindi': 'hi-IN',
-            'Marathi': 'mr-IN',
-            'Gujarati': 'gu-IN',
-            'Tamil': 'ta-IN',
-            'Telugu': 'te-IN',
-            'Kannada': 'kn-IN',
-            'Malayalam': 'ml-IN',
-            'Bengali': 'bn-IN',
-            'Punjabi': 'pa-IN',
-            'Odia': 'or-IN',
-            'Assamese': 'as-IN',
-            'Urdu': 'ur-IN'
-        };
-        return map[langName || 'English'] || 'en-US';
-    };
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+    const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+    const wsRef = useRef<any>(null);
+    const currentTurnTextRef = useRef('');
+    const isCleaningUpRef = useRef(false);
 
-    const startListening = useCallback(() => {
-        if (!('webkitSpeechRecognition' in window)) {
-            setError('Browser does not support speech recognition.');
-            return;
-        }
+    const shouldBeListeningRef = useRef(false);
+    const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-        // Prevent multiple instances
-        if (recognitionRef.current) return;
+    // Initialize GenAI client with key from process.env
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    const cleanup = useCallback(async () => {
+        if (isCleaningUpRef.current) return;
+        isCleaningUpRef.current = true;
 
         try {
-            const recognition = new window.webkitSpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = getLangCode(options.lang);
+            if (processorRef.current) {
+                processorRef.current.disconnect();
+                processorRef.current.onaudioprocess = null;
+                processorRef.current = null;
+            }
+            if (compressorRef.current) {
+                compressorRef.current.disconnect();
+                compressorRef.current = null;
+            }
+            if (sourceRef.current) {
+                sourceRef.current.disconnect();
+                sourceRef.current = null;
+            }
 
-            recognition.onstart = () => {
-                setIsListening(true);
-                setError(null);
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+                setStream(null);
+            }
+
+            if (audioContextRef.current) {
+                const ctx = audioContextRef.current;
+                audioContextRef.current = null;
+                if (ctx.state !== 'closed') {
+                    await ctx.close();
+                }
+            }
+
+            if (wsRef.current) {
+                // Close session properly
+                try {
+                    wsRef.current.close();
+                } catch (ignore) { }
+                wsRef.current = null;
+            }
+
+            if (currentTurnTextRef.current) {
+                const leftover = currentTurnTextRef.current;
+                setTranscript(prev => (prev + ' ' + leftover).trim());
+                currentTurnTextRef.current = '';
+                setInterimTranscript('');
+            }
+        } catch (error) {
+            console.error("Cleanup error:", error);
+        } finally {
+            isCleaningUpRef.current = false;
+            if (!shouldBeListeningRef.current) {
+                setIsListening(false);
+            }
+        }
+    }, []);
+
+    const startListening = useCallback(async () => {
+        if (isCleaningUpRef.current) return;
+
+        shouldBeListeningRef.current = true;
+        setError(null);
+
+        try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            const audioContext = new AudioContextClass({ sampleRate: 16000 });
+            audioContextRef.current = audioContext;
+
+            const targetLang = options.lang || 'English';
+
+            // Gemini Live Config
+            const config = {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
+                },
+                inputAudioTranscription: {}, // Request input transcription
+                systemInstruction: `You are a medical scribe. 
+            Output transcription STRICTLY in ${targetLang}. 
+            Ignore code-switching.`,
             };
 
-            recognition.onresult = (event: any) => {
-                let final = '';
-                let interim = '';
+            const sessionPromise = ai.live.connect({
+                model: MODEL_NAME,
+                config: config,
+                callbacks: {
+                    onopen: () => {
+                        console.log("✅ Gemini Live Connected");
+                        setIsListening(true);
+                    },
+                    onmessage: (message: any) => {
+                        // Handle input transcription (what the user said)
+                        const inputTranscription = message.serverContent?.inputTranscription;
+                        if (inputTranscription) {
+                            const text = inputTranscription.text;
+                            if (text) {
+                                currentTurnTextRef.current += text;
+                                setInterimTranscript(currentTurnTextRef.current);
+                            }
+                        }
 
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        final += event.results[i][0].transcript;
-                    } else {
-                        interim += event.results[i][0].transcript;
+                        // Handle turn completion
+                        if (message.serverContent?.turnComplete) {
+                            if (currentTurnTextRef.current) {
+                                const finalized = currentTurnTextRef.current;
+                                setTranscript(prev => (prev + ' ' + finalized).trim());
+                                currentTurnTextRef.current = '';
+                                setInterimTranscript('');
+                            }
+                        }
+                    },
+                    onclose: () => {
+                        console.log("Gemini Live Closed");
+                        if (shouldBeListeningRef.current) {
+                            // Auto-reconnect if dropped unexpectedly
+                            cleanup().then(() => {
+                                reconnectTimeoutRef.current = setTimeout(() => {
+                                    startListening();
+                                }, 1000);
+                            });
+                        } else {
+                            setIsListening(false);
+                        }
+                    },
+                    onerror: (err: any) => {
+                        console.error("Gemini Live Error:", err);
+                        if (!shouldBeListeningRef.current) {
+                            setError("Transmission error.");
+                            cleanup();
+                            setIsListening(false);
+                        }
                     }
                 }
+            });
 
-                if (final) {
-                    setTranscript(prev => (prev + ' ' + final).trim());
+            const session = await sessionPromise;
+            wsRef.current = session;
+
+            // Microphone Setup
+            const micStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    channelCount: 1,
+                    sampleRate: 16000 // Optimized for speech
                 }
-                setInterimTranscript(interim);
+            });
+            streamRef.current = micStream;
+            setStream(micStream);
+
+            const source = audioContext.createMediaStreamSource(micStream);
+            sourceRef.current = source;
+
+            // Dynamics Compressor to normalize volume
+            const compressor = audioContext.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-50, audioContext.currentTime);
+            compressor.ratio.setValueAtTime(12, audioContext.currentTime);
+            compressorRef.current = compressor;
+
+            // Script Processor to extract raw PCM
+            const processor = audioContext.createScriptProcessor(4096, 1, 1);
+            processorRef.current = processor;
+
+            processor.onaudioprocess = (e) => {
+                if (!wsRef.current) return;
+                const inputData = e.inputBuffer.getChannelData(0);
+                const pcmBuffer = floatTo16BitPCM(inputData);
+                const base64Audio = arrayBufferToBase64(pcmBuffer);
+                try {
+                    // Send audio chunk to Gemini
+                    wsRef.current.sendRealtimeInput({
+                        media: {
+                            mimeType: "audio/pcm;rate=16000",
+                            data: base64Audio
+                        }
+                    });
+                } catch (err) {
+                    // Silent catch for send errors during cleanup
+                }
             };
 
-            recognition.onerror = (event: any) => {
-                console.error('Speech recognition error', event.error);
-                if (event.error === 'not-allowed') {
-                    setError('Microphone access denied.');
-                    setIsListening(false);
-                }
-                // 'aborted' and 'network' are common, we will try to restart in onend
-            };
-
-            recognition.onend = () => {
-                // Only stop if we explicitly requested it
-                if (recognitionRef.current) {
-                    console.log('Speech recognition ended unexpectedly, restarting...');
-                    try {
-                        recognition.start();
-                    } catch (e) {
-                        // unexpected start error
-                    }
-                } else {
-                    setIsListening(false);
-                }
-            };
-
-            recognitionRef.current = recognition;
-            recognition.start();
+            source.connect(compressor);
+            compressor.connect(processor);
+            processor.connect(audioContext.destination);
 
         } catch (err: any) {
-            console.error('Failed to start speech recognition:', err);
-            setError(err.message);
+            console.error('Audio/Socket init failed:', err);
+            setError("Microphone or Connection failed.");
+            shouldBeListeningRef.current = false;
+            cleanup();
+            setIsListening(false);
         }
-    }, [options.lang]);
+    }, [cleanup, options.lang]);
 
-    const stopListening = useCallback(() => {
-        const recognition = recognitionRef.current;
-        if (recognition) {
-            // Clear ref FIRST to signal intentional stop to onend
-            recognitionRef.current = null;
-            recognition.stop();
+    const stopListening = useCallback(async () => {
+        shouldBeListeningRef.current = false;
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
         }
         setIsListening(false);
-    }, []);
+        await cleanup();
+    }, [cleanup]);
 
     const resetTranscript = useCallback(() => {
         setTranscript('');
         setInterimTranscript('');
+        currentTurnTextRef.current = '';
     }, []);
 
     useEffect(() => {
         return () => {
-            if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
+            shouldBeListeningRef.current = false;
+            cleanup();
         };
-    }, []);
+    }, [cleanup]);
 
     return {
         isListening,
@@ -173,7 +291,7 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
         stopListening,
         resetTranscript,
         error,
-        supported: 'webkitSpeechRecognition' in window,
-        stream: null // Not needed for Web Speech API
+        supported,
+        stream
     };
 };
