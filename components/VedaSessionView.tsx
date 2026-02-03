@@ -594,8 +594,21 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             {/* MIDDLE COLUMN: TRANSCRIPT (Independent Space) */}
             {/* Visible if mobileTab === 'session' OR screen is desktop */}
             <div className={`${mobileTab === 'session' ? 'flex' : 'hidden'} md:flex ${phase === 'active' ? 'flex-1' : 'w-full md:w-[380px]'} flex-col border-r border-slate-200 bg-white transition-all duration-500`}>
-                <div className="h-16 flex items-center px-6 border-b border-slate-200">
+                <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200">
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Transcript</span>
+
+                    {/* Mobile Stop Session (Visible only on mobile Live Tab) */}
+                    <div className="md:hidden">
+                        {phase === 'active' && (
+                            <button
+                                onClick={onEndSession}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-red-100 shadow-sm"
+                            >
+                                <Icon name="stopCircle" className="w-3 h-3" />
+                                <span>Stop</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                     {transcriptHistory.length === 0 && !transcript && !interimTranscript && (
