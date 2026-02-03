@@ -218,7 +218,262 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         setPrescriptionData
     );
 
-    // Sync phase with recorder
+    // Restoring missing functions
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const processSegment = useCallback((blob: Blob, index: number): Promise<void> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+                try {
+                    const base64Audio = (reader.result as string).split(',')[1];
+                    const latestTranscript = transcriptHistoryRef.current;
+                    const context = latestTranscript.slice(-3).map(t => `${t.speaker}: ${t.text}`).join(' ');
+
+                    const results = await processAudioSegment(base64Audio, blob.type, sessionLanguage, doctorProfile, context);
+                    if (results) {
+                        const newEntries: TranscriptEntry[] = results.map((r, i) => ({
+                            id: `seg-${index}-${i}-${Date.now()}`,
+                            speaker: r.speaker,
+                            text: r.text,
+                            segmentIndex: index
+                        }));
+                        setTranscriptHistory(prev => {
+                            if (prev.some(e => e.segmentIndex === index)) return prev;
+                            const updated = [...prev, ...newEntries];
+                            transcriptHistoryRef.current = updated;
+                            return updated;
+                        });
+
+                        // Save transcripts to database
+                        if (sessionId) {
+                            newEntries.forEach(entry => {
+                                apiService.addTranscript({
+                                    session_id: sessionId,
+                                    speaker: entry.speaker,
+                                    text: entry.text,
+                                    segment_index: entry.segmentIndex
+                                }).catch(err => console.error('Failed to save transcript:', err));
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Error processing segment ${index}:`, err);
+                } finally {
+                    processedSegmentsRef.current++;
+                    resolve();
+                }
+            };
+        });
+    }, [sessionLanguage, doctorProfile, sessionId]);
+
+    const handleStartSession = useCallback(async () => {
+        try {
+            // Create session in database
+            const session = await apiService.createSession({
+                patient_name: patient.name,
+                patient_age: patient.age,
+                patient_sex: patient.sex,
+                patient_mobile: patient.mobile,
+                patient_weight: patient.weight,
+                patient_height: patient.height,
+                patient_bmi: patient.bmi,
+                hospital_name: patient.hospitalName,
+                hospital_address: patient.hospitalAddress,
+                hospital_phone: patient.hospitalPhone
+            });
+
+            setSessionId(session.data.id);
+            console.log('✅ Session created in database:', session.data.id);
+
+            setPhase('active');
+            setDuration(0);
+            setTranscriptHistory([]);
+            transcriptHistoryRef.current = [];
+            resetTranscript();
+            setClinicalNote('');
+            processedSegmentsRef.current = 0;
+            pendingSegmentsQueue.current = [];
+            await startRecording({
+                segmentDuration: 10000,
+                vadThreshold: 0.02,
+                minSegmentDuration: 2000,
+                onSegment: (blob) => {
+                    const idx = pendingSegmentsQueue.current.length;
+                    pendingSegmentsQueue.current.push(blob);
+                    processSegment(blob, idx);
+                }
+            });
+            startListening();
+        } catch (error) {
+            console.error('Failed to create session:', error);
+            // Continue anyway with local-only mode
+            setPhase('active');
+            setDuration(0);
+            setTranscriptHistory([]);
+            transcriptHistoryRef.current = [];
+            resetTranscript();
+            setClinicalNote('');
+            processedSegmentsRef.current = 0;
+            pendingSegmentsQueue.current = [];
+            await startRecording({
+                segmentDuration: 10000,
+                vadThreshold: 0.02,
+                minSegmentDuration: 2000,
+                onSegment: (blob) => {
+                    const idx = pendingSegmentsQueue.current.length;
+                    pendingSegmentsQueue.current.push(blob);
+                    processSegment(blob, idx);
+                }
+            });
+            startListening();
+        }
+    }, [patient, startRecording, startListening, processSegment, resetTranscript]);
+
+    const handleStopSession = useCallback(async () => {
+        stopListening();
+        setPhase('processing');
+        const finalBlob = await stopRecording();
+        if (finalBlob) {
+            const idx = pendingSegmentsQueue.current.length;
+            pendingSegmentsQueue.current.push(finalBlob);
+            await processSegment(finalBlob, idx);
+        }
+
+        // Update session in database
+        if (sessionId) {
+            apiService.updateSession(sessionId, {
+                ended_at: new Date().toISOString(),
+                duration_seconds: duration,
+                status: 'processing'
+            }).catch(err => console.error('Failed to update session:', err));
+        }
+
+        let attempts = 0;
+        const checkDone = setInterval(async () => {
+            const allProcessed = processedSegmentsRef.current >= pendingSegmentsQueue.current.length;
+            const timedOut = attempts > 10;
+
+            if (allProcessed || timedOut) {
+                clearInterval(checkDone);
+                try {
+                    await handleGenerateNote();
+                } catch (err) {
+                    console.error("Note generation failed", err);
+                } finally {
+                    setPhase('review');
+                }
+            }
+            attempts++;
+        }, 500);
+    }, [stopRecording, stopListening, processSegment, sessionId, duration]);
+
+    const handleGenerateNote = async () => {
+        if (liveNote && !isGeneratingBackground) {
+            setPrescriptionData(liveNote);
+            setClinicalNote("Generated");
+
+            // Save prescription to database
+            if (sessionId) {
+                try {
+                    const prescription = await apiService.savePrescription({
+                        session_id: sessionId,
+                        subjective: liveNote.subjective,
+                        objective: liveNote.objective,
+                        assessment: liveNote.assessment,
+                        differential_diagnosis: liveNote.differentialDiagnosis,
+                        lab_results: liveNote.labResults,
+                        advice: liveNote.advice
+                    });
+                    setPrescriptionId(prescription.id);
+
+                    // Save medicines
+                    if (liveNote.medicines.length > 0) {
+                        await apiService.updateMedicines(prescription.id, liveNote.medicines);
+                    }
+
+                    console.log('✅ Prescription saved to database');
+
+                    // Update session status
+                    await apiService.updateSession(sessionId, {
+                        status: 'completed'
+                    });
+                } catch (error) {
+                    console.error('Failed to save prescription:', error);
+                }
+            }
+            return;
+        }
+
+        let latestTranscript = transcriptHistoryRef.current;
+        if (latestTranscript.length === 0 && transcriptHistory.length > 0) latestTranscript = transcriptHistory;
+        const fullTranscript = latestTranscript.map(t => `${t.speaker}: ${t.text}`).join('\n');
+
+        if (!fullTranscript.trim()) {
+            setClinicalNote("Generated");
+            return;
+        }
+
+        const noteData = await generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
+        if (noteData) {
+            setPrescriptionData(noteData);
+            setClinicalNote("Generated");
+
+            // Save prescription to database
+            if (sessionId) {
+                try {
+                    const prescription = await apiService.savePrescription({
+                        session_id: sessionId,
+                        subjective: noteData.subjective,
+                        objective: noteData.objective,
+                        assessment: noteData.assessment,
+                        differential_diagnosis: noteData.differentialDiagnosis,
+                        lab_results: noteData.labResults,
+                        advice: noteData.advice
+                    });
+                    setPrescriptionId(prescription.id);
+
+                    // Save medicines
+                    if (noteData.medicines.length > 0) {
+                        await apiService.updateMedicines(prescription.id, noteData.medicines);
+                    }
+
+                    console.log('✅ Prescription saved to database');
+
+                    // Update session status
+                    await apiService.updateSession(sessionId, {
+                        status: 'completed'
+                    });
+                } catch (error) {
+                    console.error('Failed to save prescription:', error);
+                }
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (isRecording) {
+            timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+        } else if (timerRef.current) {
+            clearInterval(timerRef.current);
+        }
+        return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    }, [isRecording]);
+
+    useEffect(() => {
+        transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [transcriptHistory, interimTranscript]);
+
+    useEffect(() => {
+        transcriptHistoryRef.current = transcriptHistory;
+    }, [transcriptHistory]);
+
+
     useEffect(() => {
         if (isRecording && phase !== 'active' && phase !== 'processing') {
             setPhase('active');
@@ -244,12 +499,13 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
             <div className="flex items-center gap-2">
                 {isVoiceEditing && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-lg animate-fadeIn">
-                        <Icon name="microphone" className="w-3 h-3 text-purple-400 animate-pulse" />
-                        <span className="text-xs text-purple-200 hidden md:inline">Listening...</span>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-lg animate-fadeIn max-w-[300px] overflow-hidden">
+                        <Icon name="microphone" className="w-3 h-3 text-purple-400 animate-pulse flex-shrink-0" />
+                        <span className="text-xs text-purple-200 truncate">
+                            {voiceEditInterim || "Listening..."}
+                        </span>
                     </div>
                 )}
-
                 {/* Hide tools during active recording to save space and reduce distraction */}
                 {phase !== 'active' && !isRecording && (
                     <>

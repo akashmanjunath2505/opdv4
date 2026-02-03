@@ -108,11 +108,13 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
             };
 
             recognition.onerror = (event: any) => {
-                console.error('Speech recognition error', event.error);
-                // Ignore 'no-speech' errors as they just mean silence
-                if (event.error !== 'no-speech') {
-                    setError(event.error);
+                // Ignore harmless errors
+                if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'network') {
+                    console.warn('Speech recognition ignored error:', event.error);
+                    return;
                 }
+                console.error('Speech recognition error', event.error);
+                setError(event.error);
             };
 
             recognition.onend = () => {
