@@ -160,6 +160,19 @@ class AuthService {
         localStorage.removeItem('auth_token');
     }
 
+    async incrementCaseCount(): Promise<Partial<User>> {
+        const { data, error } = await supabase.rpc('increment_user_cases', {
+            user_id: (await supabase.auth.getUser()).data.user?.id
+        });
+
+        if (error) {
+            console.error('Failed to increment cases:', error);
+            throw error;
+        }
+
+        return data as Partial<User>;
+    }
+
     async loginWithGoogle() {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',

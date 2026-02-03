@@ -8,6 +8,9 @@ import { useVoiceEdit } from '../hooks/useVoiceEdit';
 import { processAudioSegment, generateClinicalNote } from '../services/geminiService';
 import { renderMarkdownToHTML } from '../utils/markdownRenderer';
 import { apiService } from '../services/apiService';
+import { authService } from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 interface ScribeSessionViewProps {
     onEndSession: () => void;
@@ -169,6 +172,7 @@ const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptio
 
 
 export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSession, doctorProfile, language: defaultLanguage }) => {
+    const { refreshUser } = useAuth();
     const [phase, setPhase] = useState<'consent' | 'active' | 'processing' | 'review'>('consent');
     const [sessionLanguage, setSessionLanguage] = useState(defaultLanguage || "Automatic Language Detection");
     const [transcriptHistory, setTranscriptHistory] = useState<TranscriptEntry[]>([]);
@@ -756,7 +760,15 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                 <h3 className="text-lg font-bold text-gray-900">Prescription Preview</h3>
                                 <div className="flex items-center gap-3">
                                     <button
-                                        onClick={() => window.print()}
+                                        onClick={async () => {
+                                            try {
+                                                await authService.incrementCaseCount();
+                                                await refreshUser(); // Update local stats instantly
+                                                window.print();
+                                            } catch (error: any) {
+                                                toast.error(error.message || "Failed to update case count");
+                                            }
+                                        }}
                                         className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
                                     >
                                         <Icon name="download" className="w-4 h-4" />
