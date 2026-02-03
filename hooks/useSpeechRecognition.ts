@@ -22,6 +22,8 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
     const shouldListenRef = useRef(false);
     // Ref to hold the recognition instance
     const recognitionRef = useRef<any>(null);
+    const retryCountRef = useRef(0);
+    const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Helper to map language names to BCP 47 tags
     const getLangCode = (langName?: string) => {
@@ -56,7 +58,8 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
         setError(null);
 
         try {
-            const recognition = new window.webkitSpeechRecognition();
+            // @ts-ignore - webkitSpeechRecognition is not standard in all TS libs
+            const recognition = new (window as any).webkitSpeechRecognition();
             recognition.continuous = true;
             recognition.interimResults = true;
             recognition.lang = getLangCode(options.lang);
@@ -64,6 +67,7 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
             recognition.onstart = () => {
                 setIsListening(true);
                 setError(null);
+                retryCountRef.current = 0; // Reset retries on success
             };
 
             recognition.onresult = (event: any) => {
@@ -103,19 +107,24 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
             recognition.onend = () => {
                 // If we should still be listening, restart!
                 if (shouldListenRef.current) {
-                    // Add a small delay to prevent rapid-fire restart loops if something is broken
-                    setTimeout(() => {
+                    // Exponential backoff for retries to handle network blips
+                    const delay = Math.min(1000 * Math.pow(1.5, retryCountRef.current), 10000); // Cap at 10s
+
+                    retryTimeoutRef.current = setTimeout(() => {
                         if (shouldListenRef.current) { // Check again
                             try {
+                                retryCountRef.current++;
+                                console.log(`🔄 Restarting speech recognition (Attempt ${retryCountRef.current})...`);
                                 recognition.start();
                             } catch (e) {
                                 console.error("Failed to restart recognition:", e);
                                 setIsListening(false);
                             }
                         }
-                    }, 100);
+                    }, delay);
                 } else {
                     setIsListening(false);
+                    retryCountRef.current = 0;
                 }
             };
 
@@ -131,6 +140,8 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
 
     const stopListening = useCallback(() => {
         shouldListenRef.current = false; // Explicitly stop
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+
         if (recognitionRef.current) {
             recognitionRef.current.stop();
             // We don't nullify it immediately to allow onend to fire cleanly, 
@@ -146,6 +157,7 @@ export const useSpeechRecognition = (options: { lang?: string } = {}): UseSpeech
     useEffect(() => {
         return () => {
             shouldListenRef.current = false;
+            if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
             if (recognitionRef.current) {
                 recognitionRef.current.stop();
             }
