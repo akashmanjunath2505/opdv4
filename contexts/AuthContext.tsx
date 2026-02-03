@@ -57,26 +57,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('Auth State Change:', event);
 
             if (event === 'SIGNED_IN' && session) {
-                // Determine if we need to fetch profile (avoid double fetch if initSession did it)
-                // But simplified: just fetch it.
-                try {
-                    const currentUser = await authService.getCurrentUser();
-                    if (mounted) {
-                        setUser(currentUser);
-                        setLoading(false);
-                        clearTimeout(safetyTimeout);
-                        toast.success('Welcome back!'); // Show success here
+                // Retry logic for profile fetching to handle race conditions or network blips
+                let attempts = 0;
+                const maxAttempts = 3;
+
+                const fetchProfileWithRetry = async () => {
+                    try {
+                        const currentUser = await authService.getCurrentUser();
+                        if (mounted) {
+                            setUser(currentUser);
+                            setLoading(false);
+                            clearTimeout(safetyTimeout);
+                            // Only toast if this was a fresh login (not just a refresh)
+                            // We can't easily detect "fresh" vs "refresh" here without more state, 
+                            // but we can check if user was previously null.
+                            if (!user) toast.success('Welcome back!');
+                        }
+                    } catch (err: any) {
+                        attempts++;
+                        console.error(`Profile fetch failed (Attempt ${attempts}/${maxAttempts}):`, err);
+
+                        if (attempts < maxAttempts) {
+                            setTimeout(fetchProfileWithRetry, 1500 * attempts); // Backoff: 1.5s, 3s
+                        } else {
+                            toast.error('Login successful, but profile could not be loaded. Please refresh.');
+                            if (mounted) setLoading(false);
+                        }
                     }
-                } catch (err: any) {
-                    console.error('Profile fetch failed:', err);
-                    toast.error('Login successful, but profile could not be loaded.');
-                    if (mounted) setLoading(false);
-                }
+                };
+
+                fetchProfileWithRetry();
+
             } else if (event === 'SIGNED_OUT') {
                 if (mounted) {
                     setUser(null);
                     setLoading(false);
                 }
+            } else if (event === 'INITIAL_SESSION') {
+                // Handle initial session check if separate from initSession logic
             }
         });
 

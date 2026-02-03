@@ -2,7 +2,6 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LanguageSelector } from './LanguageSelector';
 
-
 interface DashboardProps {
     onStartSession: (language: string) => void;
     onUpgrade?: () => void;
