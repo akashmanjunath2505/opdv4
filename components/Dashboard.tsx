@@ -66,7 +66,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
             </header>
 
             {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
                 {/* Welcome Section */}
                 <div className="mb-8">
                     <h2 className="text-3xl font-bold text-slate-900 mb-2">
@@ -147,7 +147,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                 )}
 
                 {/* Start Session Card */}
-                <div className="bg-white rounded-lg shadow-sm p-8">
+                <div className="bg-white rounded-lg shadow-sm p-4 md:p-8">
                     <div className="text-center max-w-2xl mx-auto">
                         <div className="mb-6">
                             <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">

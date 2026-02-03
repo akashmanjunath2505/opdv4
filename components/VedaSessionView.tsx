@@ -79,8 +79,8 @@ const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptio
             <div className="h-0.5 bg-[#8A63D2] w-full mb-5"></div>
 
             {/* Demographics Grid */}
-            <div className="grid grid-cols-2 border border-gray-300 mb-5 relative" style={{ breakInside: 'avoid' }}>
-                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-300"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 border border-gray-300 mb-5 relative" style={{ breakInside: 'avoid' }}>
+                <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-px bg-gray-300"></div>
                 <div className={`${metaLabelSize} space-y-3.5 p-3.5`}>
                     <div className="font-bold">Name/ID - <span className="font-normal ml-1">{patient.name}</span></div>
                     <div className="font-bold">Age - <span className="font-normal ml-1">{patient.age}</span></div>
@@ -100,12 +100,12 @@ const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptio
             </div>
 
             {/* Side-by-Side: Chief Complaints & Clinical Findings */}
-            <div className="grid grid-cols-2 border-l border-r border-t border-gray-300 bg-[#F0F7FF]">
-                <div className={`${baseFontSize} p-2 font-bold border-r border-gray-300 uppercase tracking-tighter`}>Chief Complaint</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 border-l border-r border-t border-gray-300 bg-[#F0F7FF]">
+                <div className={`${baseFontSize} p-2 font-bold border-b md:border-b-0 border-r md:border-r border-gray-300 uppercase tracking-tighter`}>Chief Complaint</div>
                 <div className={`${baseFontSize} p-2 font-bold uppercase tracking-tighter`}>Clinical Findings</div>
             </div>
-            <div className={`grid grid-cols-2 border border-gray-300 mb-5`}>
-                <div className={`${baseFontSize} p-4 border-r border-gray-300 whitespace-pre-wrap leading-relaxed min-h-[140px] font-normal`}>
+            <div className={`grid grid-cols-1 md:grid-cols-2 border border-gray-300 mb-5`}>
+                <div className={`${baseFontSize} p-4 border-b md:border-b-0 border-r md:border-r border-gray-300 whitespace-pre-wrap leading-relaxed min-h-[140px] font-normal`}>
                     {prescriptionData.subjective}
                 </div>
                 <div className={`${baseFontSize} p-4 whitespace-pre-wrap leading-relaxed min-h-[140px] font-normal`}>
@@ -182,6 +182,8 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
     // NEW: Left Panel State
     const [activeTab, setActiveTab] = useState<'transcript' | 'checklist'>('transcript');
+    // Mobile Tab State
+    const [mobileTab, setMobileTab] = useState<'session' | 'editor'>('session');
 
     const [patient, setPatient] = useState<PatientDemographics>({
         name: '', age: '', sex: '', mobile: '', weight: '', height: '', bmi: '',
@@ -520,8 +522,30 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 .animate-wave { animation: wave 1s ease-in-out infinite; }
             `}</style>
 
+            {/* MOBILE TABS (Bottom Interaction Bar or Top) */}
+            <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 p-1.5 bg-[#1a1b20] border border-white/10 rounded-full shadow-2xl">
+                <button
+                    onClick={() => setMobileTab('session')}
+                    className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${mobileTab === 'session' ? 'bg-aivana-accent text-white' : 'text-gray-400'}`}
+                >
+                    Live
+                </button>
+                <button
+                    onClick={() => setMobileTab('editor')}
+                    className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${mobileTab === 'editor' ? 'bg-aivana-accent text-white' : 'text-gray-400'}`}
+                >
+                    Notes
+                </button>
+            </div>
+
             {/* LEFT SIDEBAR: SESSION INFO */}
-            <div className="w-[300px] flex flex-col border-r border-white/5 bg-[#0f1014] z-20">
+            {/* Desktop: Always Visible. Mobile: Hidden unless in 'session' tab? Actually, maybe hide sidebar on mobile entirely or put in menu. 
+                Let's hide it on mobile for now to save space, or make it a slide-out.
+                For simplicity: Hidden on mobile, accessible via menu if needed? 
+                Better: Stack it? No space.
+                Let's hide it on mobile small screens < 768px.
+            */}
+            <div className="hidden md:flex w-[300px] flex-col border-r border-white/5 bg-[#0f1014] z-20">
                 <div className="p-6 border-b border-white/5">
                     {/* Replaced Global Sidebar Header */}
                     <div className="flex items-center gap-2 mb-8">
@@ -565,7 +589,8 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             </div>
 
             {/* MIDDLE COLUMN: TRANSCRIPT (Independent Space) */}
-            <div className={`${phase === 'active' ? 'flex-1' : 'w-[380px]'} flex flex-col border-r border-white/5 bg-black/40 transition-all duration-500`}>
+            {/* Visible if mobileTab === 'session' OR screen is desktop */}
+            <div className={`${mobileTab === 'session' ? 'flex' : 'hidden'} md:flex ${phase === 'active' ? 'flex-1' : 'w-full md:w-[380px]'} flex-col border-r border-white/5 bg-black/40 transition-all duration-500`}>
                 <div className="h-16 flex items-center px-6 border-b border-white/5">
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-aivana-accent">Transcript</span>
                 </div>
@@ -620,7 +645,8 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             </div>
 
             {/* RIGHT PANEL: MAIN EDITOR (Bigger Focus) */}
-            <div className={`${phase === 'active' ? 'w-[450px]' : 'flex-1'} flex flex-col relative bg-aivana-dark transition-all duration-500`}>
+            {/* Visible if mobileTab === 'editor' OR screen is desktop */}
+            <div className={`${mobileTab === 'editor' ? 'flex' : 'hidden'} md:flex ${phase === 'active' ? 'md:w-[450px]' : 'flex-1'} w-full flex-col relative bg-aivana-dark transition-all duration-500`}>
                 {/* Header Bar */}
                 <header className="h-16 border-b border-white/5 bg-black/20 px-4 flex items-center justify-between">
                     <div className={`flex items-center gap-${phase === 'active' ? '2' : '6'}`}>
@@ -662,7 +688,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         <button onClick={onEndSession} className="p-2 text-gray-500 hover:text-white transition-colors"><Icon name="x" className="w-5 h-5" /></button>
                     </div>
                 </header>
-
                 {/* Active Recording Placeholder */}
                 {phase === 'active' && (
                     <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20 text-center">
