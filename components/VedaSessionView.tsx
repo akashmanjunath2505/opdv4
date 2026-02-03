@@ -594,21 +594,8 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             {/* MIDDLE COLUMN: TRANSCRIPT (Independent Space) */}
             {/* Visible if mobileTab === 'session' OR screen is desktop */}
             <div className={`${mobileTab === 'session' ? 'flex' : 'hidden'} md:flex ${phase === 'active' ? 'flex-1' : 'w-full md:w-[380px]'} flex-col border-r border-slate-200 bg-white transition-all duration-500`}>
-                <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200">
+                <div className="h-16 flex items-center px-6 border-b border-slate-200">
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Transcript</span>
-
-                    {/* Mobile Stop Session (Visible only on mobile Live Tab) */}
-                    <div className="md:hidden">
-                        {phase === 'active' && (
-                            <button
-                                onClick={onEndSession}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-red-100 shadow-sm"
-                            >
-                                <Icon name="stopCircle" className="w-3 h-3" />
-                                <span>Stop</span>
-                            </button>
-                        )}
-                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                     {transcriptHistory.length === 0 && !transcript && !interimTranscript && (
@@ -655,6 +642,19 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                     {interimTranscript && (
                         <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl text-blue-800/70 text-sm animate-pulse">
                             {interimTranscript}
+                        </div>
+                    )}
+
+                    {/* Mobile Stop Transcription Button (Floating) */}
+                    {isListening && phase === 'active' && (
+                        <div className="md:hidden sticky bottom-4 flex justify-center pb-20 pointer-events-none">
+                            <button
+                                onClick={onEndSession} // Assuming onEndSession handles stopping; if there's a specific simple stop, use that. Usually 'stopRecording' triggers processing phase.
+                                className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-full font-bold shadow-lg shadow-red-500/30 hover:bg-red-600 transition-transform active:scale-95 animate-fadeInUp"
+                            >
+                                <Icon name="stopCircle" className="w-5 h-5" />
+                                <span>Stop Transcription</span>
+                            </button>
                         </div>
                     )}
                 </div>
@@ -767,8 +767,8 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Diagnosis</label>
-                            <input value={prescriptionData.differentialDiagnosis} onChange={e => setPrescriptionData({ ...prescriptionData, differentialDiagnosis: e.target.value })} className="w-full bg-white border border-slate-200 rounded-xl p-4 text-slate-900 text-lg font-medium outline-none focus:border-blue-600 transition-all placeholder-slate-400" placeholder="Enter Diagnosis..." />
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Differential Diagnosis</label>
+                            <input value={prescriptionData.differentialDiagnosis} onChange={e => setPrescriptionData({ ...prescriptionData, differentialDiagnosis: e.target.value })} className="w-full bg-white border border-slate-200 rounded-xl p-4 text-slate-900 text-lg font-medium outline-none focus:border-blue-600 transition-all placeholder-slate-400" placeholder="Enter Differential Diagnosis..." />
                         </div>
 
                         {/* Medicines */}
