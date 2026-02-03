@@ -218,262 +218,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         setPrescriptionData
     );
 
-    // Restoring missing functions
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const processSegment = useCallback((blob: Blob, index: number): Promise<void> => {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onloadend = async () => {
-                try {
-                    const base64Audio = (reader.result as string).split(',')[1];
-                    const latestTranscript = transcriptHistoryRef.current;
-                    const context = latestTranscript.slice(-3).map(t => `${t.speaker}: ${t.text}`).join(' ');
-
-                    const results = await processAudioSegment(base64Audio, blob.type, sessionLanguage, doctorProfile, context);
-                    if (results) {
-                        const newEntries: TranscriptEntry[] = results.map((r, i) => ({
-                            id: `seg-${index}-${i}-${Date.now()}`,
-                            speaker: r.speaker,
-                            text: r.text,
-                            segmentIndex: index
-                        }));
-                        setTranscriptHistory(prev => {
-                            if (prev.some(e => e.segmentIndex === index)) return prev;
-                            const updated = [...prev, ...newEntries];
-                            transcriptHistoryRef.current = updated;
-                            return updated;
-                        });
-
-                        // Save transcripts to database
-                        if (sessionId) {
-                            newEntries.forEach(entry => {
-                                apiService.addTranscript({
-                                    session_id: sessionId,
-                                    speaker: entry.speaker,
-                                    text: entry.text,
-                                    segment_index: entry.segmentIndex
-                                }).catch(err => console.error('Failed to save transcript:', err));
-                            });
-                        }
-                    }
-                } catch (err) {
-                    console.error(`Error processing segment ${index}:`, err);
-                } finally {
-                    processedSegmentsRef.current++;
-                    resolve();
-                }
-            };
-        });
-    }, [sessionLanguage, doctorProfile, sessionId]);
-
-    const handleStartSession = useCallback(async () => {
-        try {
-            // Create session in database
-            const session = await apiService.createSession({
-                patient_name: patient.name,
-                patient_age: patient.age,
-                patient_sex: patient.sex,
-                patient_mobile: patient.mobile,
-                patient_weight: patient.weight,
-                patient_height: patient.height,
-                patient_bmi: patient.bmi,
-                hospital_name: patient.hospitalName,
-                hospital_address: patient.hospitalAddress,
-                hospital_phone: patient.hospitalPhone
-            });
-
-            setSessionId(session.data.id);
-            console.log('✅ Session created in database:', session.data.id);
-
-            setPhase('active');
-            setDuration(0);
-            setTranscriptHistory([]);
-            transcriptHistoryRef.current = [];
-            resetTranscript();
-            setClinicalNote('');
-            processedSegmentsRef.current = 0;
-            pendingSegmentsQueue.current = [];
-            await startRecording({
-                segmentDuration: 10000,
-                vadThreshold: 0.02,
-                minSegmentDuration: 2000,
-                onSegment: (blob) => {
-                    const idx = pendingSegmentsQueue.current.length;
-                    pendingSegmentsQueue.current.push(blob);
-                    processSegment(blob, idx);
-                }
-            });
-            startListening();
-        } catch (error) {
-            console.error('Failed to create session:', error);
-            // Continue anyway with local-only mode
-            setPhase('active');
-            setDuration(0);
-            setTranscriptHistory([]);
-            transcriptHistoryRef.current = [];
-            resetTranscript();
-            setClinicalNote('');
-            processedSegmentsRef.current = 0;
-            pendingSegmentsQueue.current = [];
-            await startRecording({
-                segmentDuration: 10000,
-                vadThreshold: 0.02,
-                minSegmentDuration: 2000,
-                onSegment: (blob) => {
-                    const idx = pendingSegmentsQueue.current.length;
-                    pendingSegmentsQueue.current.push(blob);
-                    processSegment(blob, idx);
-                }
-            });
-            startListening();
-        }
-    }, [patient, startRecording, startListening, processSegment, resetTranscript]);
-
-    const handleStopSession = useCallback(async () => {
-        stopListening();
-        setPhase('processing');
-        const finalBlob = await stopRecording();
-        if (finalBlob) {
-            const idx = pendingSegmentsQueue.current.length;
-            pendingSegmentsQueue.current.push(finalBlob);
-            await processSegment(finalBlob, idx);
-        }
-
-        // Update session in database
-        if (sessionId) {
-            apiService.updateSession(sessionId, {
-                ended_at: new Date().toISOString(),
-                duration_seconds: duration,
-                status: 'processing'
-            }).catch(err => console.error('Failed to update session:', err));
-        }
-
-        let attempts = 0;
-        const checkDone = setInterval(async () => {
-            const allProcessed = processedSegmentsRef.current >= pendingSegmentsQueue.current.length;
-            const timedOut = attempts > 10;
-
-            if (allProcessed || timedOut) {
-                clearInterval(checkDone);
-                try {
-                    await handleGenerateNote();
-                } catch (err) {
-                    console.error("Note generation failed", err);
-                } finally {
-                    setPhase('review');
-                }
-            }
-            attempts++;
-        }, 500);
-    }, [stopRecording, stopListening, processSegment, sessionId, duration]);
-
-    const handleGenerateNote = async () => {
-        if (liveNote && !isGeneratingBackground) {
-            setPrescriptionData(liveNote);
-            setClinicalNote("Generated");
-
-            // Save prescription to database
-            if (sessionId) {
-                try {
-                    const prescription = await apiService.savePrescription({
-                        session_id: sessionId,
-                        subjective: liveNote.subjective,
-                        objective: liveNote.objective,
-                        assessment: liveNote.assessment,
-                        differential_diagnosis: liveNote.differentialDiagnosis,
-                        lab_results: liveNote.labResults,
-                        advice: liveNote.advice
-                    });
-                    setPrescriptionId(prescription.id);
-
-                    // Save medicines
-                    if (liveNote.medicines.length > 0) {
-                        await apiService.updateMedicines(prescription.id, liveNote.medicines);
-                    }
-
-                    console.log('✅ Prescription saved to database');
-
-                    // Update session status
-                    await apiService.updateSession(sessionId, {
-                        status: 'completed'
-                    });
-                } catch (error) {
-                    console.error('Failed to save prescription:', error);
-                }
-            }
-            return;
-        }
-
-        let latestTranscript = transcriptHistoryRef.current;
-        if (latestTranscript.length === 0 && transcriptHistory.length > 0) latestTranscript = transcriptHistory;
-        const fullTranscript = latestTranscript.map(t => `${t.speaker}: ${t.text}`).join('\n');
-
-        if (!fullTranscript.trim()) {
-            setClinicalNote("Generated");
-            return;
-        }
-
-        const noteData = await generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
-        if (noteData) {
-            setPrescriptionData(noteData);
-            setClinicalNote("Generated");
-
-            // Save prescription to database
-            if (sessionId) {
-                try {
-                    const prescription = await apiService.savePrescription({
-                        session_id: sessionId,
-                        subjective: noteData.subjective,
-                        objective: noteData.objective,
-                        assessment: noteData.assessment,
-                        differential_diagnosis: noteData.differentialDiagnosis,
-                        lab_results: noteData.labResults,
-                        advice: noteData.advice
-                    });
-                    setPrescriptionId(prescription.id);
-
-                    // Save medicines
-                    if (noteData.medicines.length > 0) {
-                        await apiService.updateMedicines(prescription.id, noteData.medicines);
-                    }
-
-                    console.log('✅ Prescription saved to database');
-
-                    // Update session status
-                    await apiService.updateSession(sessionId, {
-                        status: 'completed'
-                    });
-                } catch (error) {
-                    console.error('Failed to save prescription:', error);
-                }
-            }
-        }
-    };
-
-    useEffect(() => {
-        if (isRecording) {
-            timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
-        } else if (timerRef.current) {
-            clearInterval(timerRef.current);
-        }
-        return () => { if (timerRef.current) clearInterval(timerRef.current); };
-    }, [isRecording]);
-
-    useEffect(() => {
-        transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [transcriptHistory, interimTranscript]);
-
-    useEffect(() => {
-        transcriptHistoryRef.current = transcriptHistory;
-    }, [transcriptHistory]);
-
-
+    // Sync phase with recorder
     useEffect(() => {
         if (isRecording && phase !== 'active' && phase !== 'processing') {
             setPhase('active');
@@ -481,6 +226,8 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     }, [isRecording, phase]);
 
     // ... existing effects ...
+
+    // ...
 
     {/* RIGHT PANEL: MAIN EDITOR (Bigger Focus) */ }
     <div className={`${phase === 'active' || isRecording ? 'w-[450px]' : 'flex-1'} flex flex-col relative bg-aivana-dark transition-all duration-500`}>
@@ -497,13 +244,12 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
             <div className="flex items-center gap-2">
                 {isVoiceEditing && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-lg animate-fadeIn max-w-[300px] overflow-hidden">
-                        <Icon name="microphone" className="w-3 h-3 text-purple-400 animate-pulse flex-shrink-0" />
-                        <span className="text-xs text-purple-200 truncate">
-                            {voiceEditInterim || "Listening..."}
-                        </span>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-lg animate-fadeIn">
+                        <Icon name="microphone" className="w-3 h-3 text-purple-400 animate-pulse" />
+                        <span className="text-xs text-purple-200 hidden md:inline">Listening...</span>
                     </div>
                 )}
+
                 {/* Hide tools during active recording to save space and reduce distraction */}
                 {phase !== 'active' && !isRecording && (
                     <>
@@ -525,22 +271,20 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 )}
                 <button onClick={onEndSession} className="p-2 text-gray-500 hover:text-white transition-colors"><Icon name="x" className="w-5 h-5" /></button>
             </div>
-        </header >
+        </header>
 
         {/* Active Recording Placeholder */}
-        {
-            (phase === 'active' || isRecording) && (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20 text-center">
-                    <div className="w-20 h-20 mb-6 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
-                        <Icon name="microphone" className="w-8 h-8 text-red-500" />
-                    </div>
-                    <h3 className="text-lg font-bold text-white mb-2">Recording in Progress</h3>
-                    <p className="text-sm text-gray-500 max-w-[200px]">
-                        Live transcription is active in the expanded center panel.
-                    </p>
+        {(phase === 'active' || isRecording) && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black/20 text-center">
+                <div className="w-20 h-20 mb-6 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
+                    <Icon name="microphone" className="w-8 h-8 text-red-500" />
                 </div>
-            )
-        }
+                <h3 className="text-lg font-bold text-white mb-2">Recording in Progress</h3>
+                <p className="text-sm text-gray-500 max-w-[200px]">
+                    Live transcription is active in the expanded center panel.
+                </p>
+            </div>
+        )}
 
         {/* Main Editor Canvas */}
         <div className={`flex-1 overflow-y-auto p-6 md:p-8 bg-black/20 ${phase === 'active' ? 'hidden' : 'block'}`}>
@@ -611,43 +355,39 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         </div>
 
         {/* Processing Overlay */}
-        {
-            phase === 'processing' && (
-                <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center z-50">
-                    <div className="w-16 h-16 border-t-2 border-aivana-accent rounded-full animate-spin mb-4"></div>
-                    <h2 className="text-2xl font-bold text-white tracking-widest uppercase">Processing Session</h2>
-                </div>
-            )
-        }
+        {phase === 'processing' && (
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center z-50">
+                <div className="w-16 h-16 border-t-2 border-aivana-accent rounded-full animate-spin mb-4"></div>
+                <h2 className="text-2xl font-bold text-white tracking-widest uppercase">Processing Session</h2>
+            </div>
+        )}
 
         {/* PDF Preview Modal */}
-        {
-            showPdfPreview && (
-                <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-8" onClick={() => setShowPdfPreview(false)}>
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
-                            <h3 className="text-lg font-bold text-gray-900">Prescription Preview</h3>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => window.print()}
-                                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                >
-                                    <Icon name="download" className="w-4 h-4" />
-                                    <span>Download PDF</span>
-                                </button>
-                                <button onClick={() => setShowPdfPreview(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                    <Icon name="close" className="w-5 h-5 text-gray-600" />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="p-6">
-                            <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview />
+        {showPdfPreview && (
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-8" onClick={() => setShowPdfPreview(false)}>
+                <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+                        <h3 className="text-lg font-bold text-gray-900">Prescription Preview</h3>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => window.print()}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                            >
+                                <Icon name="download" className="w-4 h-4" />
+                                <span>Download PDF</span>
+                            </button>
+                            <button onClick={() => setShowPdfPreview(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                                <Icon name="close" className="w-5 h-5 text-gray-600" />
+                            </button>
                         </div>
                     </div>
+                    <div className="p-6">
+                        <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview />
+                    </div>
                 </div>
-            )
-        }
-    </div >
+            </div>
+        )}
+    </div>
         </div >
     );
 };
