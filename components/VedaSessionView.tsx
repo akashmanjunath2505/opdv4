@@ -201,7 +201,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const transcriptEndRef = useRef<HTMLDivElement>(null);
 
     const { isRecording, startRecording, stopRecording } = useAudioRecorder();
-    const { startListening, stopListening, interimTranscript, transcript, resetTranscript } = useSpeechRecognition({ lang: sessionLanguage });
+    const { startListening, stopListening, interimTranscript, transcript, resetTranscript, isListening } = useSpeechRecognition({ lang: sessionLanguage });
 
     // Background Generation Hook
     const { liveNote, isGenerating: isGeneratingBackground } = useLiveScribe(
@@ -561,8 +561,8 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                     {transcriptHistory.length === 0 && !transcript && !interimTranscript && (
                         <div className="flex flex-col items-center justify-center h-40 opacity-20">
-                            <Icon name="message" className="w-8 h-8 mb-2" />
-                            <p className="text-[10px] uppercase tracking-widest">No Speech Detected</p>
+                            <Icon name={isListening ? "microphone" : "message"} className={`w-8 h-8 mb-2 ${isListening ? 'animate-pulse text-aivana-accent' : ''}`} />
+                            <p className="text-[10px] uppercase tracking-widest">{isListening ? "Listening for speech..." : "No Speech Detected"}</p>
                         </div>
                     )}
 
