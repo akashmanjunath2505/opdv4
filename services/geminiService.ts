@@ -17,14 +17,52 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const SUPPORTED_LANGUAGES = ["English", "Hindi", "Marathi", "Gujarati", "Tamil", "Telugu", "Kannada", "Malayalam", "Bengali", "Punjabi", "Odia", "Assamese", "Urdu"];
 
-// FIX: Updated model name to latest version according to guidelines
-export const processAudioSegment = async (
+// ... (existing exports)
+
+// Helper: Transcribe a short audio command using Gemini (fallback for Web Speech API)
+export const transcribeAudioCommand = async (
   base64Audio: string,
   mimeType: string,
-  language: string,
-  doctorProfile: DoctorProfile,
-  previousContext: string = ""
-): Promise<{ speaker: 'Doctor' | 'Patient'; text: string }[] | null> => {
+  language: string
+): Promise<string | null> => {
+  // Force English model for command understanding if preferred, or use polyglot
+  // Command transcription needs to be verbatim
+  const systemInstruction = `
+    You are a speech-to-text engine. 
+    TASK: Transcribe the following audio command EXACTLY as spoken.
+    
+    CONTEXT: This is a medical doctor giving a command to a scribe software (e.g., "Change age to 45", "Add diabetes to diagnosis").
+    
+    LANGUAGE: ${language}.
+    
+    OUTPUT: Return ONLY the raw transcribed text. Do not add quotes, prefixes, or markdown.
+  `;
+
+  try {
+    const audioPart = {
+      inlineData: { data: base64Audio, mimeType },
+    };
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: { parts: [audioPart, { text: "Transcribe this command." }] },
+      config: {
+        systemInstruction,
+        temperature: 0,
+      },
+    });
+
+    return response.text ? response.text.trim() : null;
+  } catch (error) {
+    console.error("Command transcription error:", error);
+    return null;
+  }
+};
+
+// FIX: Updated model name to latest version according to guidelines
+export const processAudioSegment = async (
+// ... existing processAudioSegment signature
+
   const systemInstruction = `
     You are an advanced Medical Scribe specialized in Indian clinical contexts.
     
@@ -52,38 +90,38 @@ export const processAudioSegment = async (
     3. Ensure high accuracy for Indian accents and multilingual conversations.
   `;
 
-  try {
-    const audioPart = {
-      inlineData: { data: base64Audio, mimeType },
-    };
+try {
+  const audioPart = {
+    inlineData: { data: base64Audio, mimeType },
+  };
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: { parts: [audioPart, { text: "Transcribe and normalize this clinical segment." }] },
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-        temperature: 0,
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              speaker: { type: Type.STRING, enum: ['Doctor', 'Patient'] },
-              text: { type: Type.STRING },
-              detectedLanguage: { type: Type.STRING },
-            },
-            required: ['speaker', 'text', 'detectedLanguage'],
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: { parts: [audioPart, { text: "Transcribe and normalize this clinical segment." }] },
+    config: {
+      systemInstruction,
+      responseMimeType: "application/json",
+      temperature: 0,
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            speaker: { type: Type.STRING, enum: ['Doctor', 'Patient'] },
+            text: { type: Type.STRING },
+            detectedLanguage: { type: Type.STRING },
           },
+          required: ['speaker', 'text', 'detectedLanguage'],
         },
       },
-    });
+    },
+  });
 
-    return JSON.parse(response.text || '[]');
-  } catch (error) {
-    console.error("Segment processing error:", error);
-    return null;
-  }
+  return JSON.parse(response.text || '[]');
+} catch (error) {
+  console.error("Segment processing error:", error);
+  return null;
+}
 };
 
 export const cleanupTranscript = async (

@@ -1,8 +1,7 @@
-
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { PrescriptionData, DoctorProfile } from '../types';
-import { useSpeechRecognition } from './useSpeechRecognition';
-import { processVoiceEdit } from '../services/geminiService';
+import { processVoiceEdit, transcribeAudioCommand } from '../services/geminiService';
+import { useAudioRecorder } from './useAudioRecorder';
 
 export const useVoiceEdit = (
     currentData: PrescriptionData,
@@ -11,82 +10,88 @@ export const useVoiceEdit = (
     onUpdate: (newData: PrescriptionData) => void
 ) => {
     const [isProcessing, setIsProcessing] = useState(false);
-    const { isListening, startListening, stopListening, transcript, interimTranscript, resetTranscript } = useSpeechRecognition({ lang: language });
 
-    // UI State: Are we *intending* to listen?
+    // Switch to Audio Recorder as primary mechanism to bypass Web Speech API network errors
+    const { startRecording, stopRecording, isRecording } = useAudioRecorder();
+
+    // UI State
     const [isActive, setIsActive] = useState(false);
     const isActiveRef = useRef(false);
 
-    // Track if we are in the "finalizing" phase (stopped UI, but waiting for hardware to stop)
-    const isStoppingRef = useRef(false);
-
-    const handleToggleListeningWithState = useCallback(() => {
-        // Prevent toggle if we are currently processing or in the middle of stopping
-        if (isProcessing || isStoppingRef.current) return;
+    const handleToggleListening = useCallback(async () => {
+        if (isProcessing) return;
 
         if (isActiveRef.current) {
             // STOP ACTION
-            console.log('[Voice Edit] User clicked Stop');
+            console.log('[Voice Edit] User clicked Stop (Audio Mode)');
             isActiveRef.current = false;
             setIsActive(false);
 
-            // Mark as stopping so we don't allow restart until processing is done/started
-            isStoppingRef.current = true;
+            // Stop recorder and get blob
+            setIsProcessing(true); // Show processing immediately
+            const audioBlob = await stopRecording();
 
-            stopListening();
+            if (audioBlob) {
+                console.log('[Voice Edit] Audio captured, size:', audioBlob.size);
+                processAudioCheck(audioBlob);
+            } else {
+                console.warn('[Voice Edit] No audio blob captured');
+                setIsProcessing(false);
+            }
+
         } else {
             // START ACTION
-            console.log('[Voice Edit] User clicked Start');
-            resetTranscript();
+            console.log('[Voice Edit] User clicked Start (Audio Mode)');
             isActiveRef.current = true;
             setIsActive(true);
-            isStoppingRef.current = false;
-            startListening();
+
+            // Start recording
+            await startRecording({
+                // No need for VAD for explicit command recording
+                segmentDuration: 60000 // Max 60s command
+            });
         }
-    }, [isProcessing, startListening, stopListening, resetTranscript]);
+    }, [isProcessing, startRecording, stopRecording]);
 
-    useEffect(() => {
-        // Trigger processing when hardware listening stops AND we intended to stop
-        // We check !isActiveRef.current (User pressed stop) and !isListening (Hardware confirmed stop)
-        if (!isListening && !isActiveRef.current && isStoppingRef.current) {
+    const processAudioCheck = async (blob: Blob) => {
+        try {
+            // Convert blob to base64
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+                const base64String = reader.result as string;
+                const base64Audio = base64String.split(',')[1];
 
-            const currentTranscript = transcript.trim();
-            console.log('[Voice Edit] Hardware stopped. Transcript:', currentTranscript);
+                // 1. Transcribe
+                console.log('[Voice Edit] Transcribing command...');
+                // Clean mime type just in case
+                const mimeType = blob.type || 'audio/webm';
+                const transcript = await transcribeAudioCommand(base64Audio, mimeType, language);
+                console.log('[Voice Edit] Transcript:', transcript);
 
-            if (currentTranscript) {
-                const process = async () => {
-                    setIsProcessing(true);
-                    try {
-                        const updatedData = await processVoiceEdit(currentData, currentTranscript, doctorProfile, language);
-                        if (updatedData) {
-                            onUpdate(updatedData);
-                        }
-                    } catch (error) {
-                        console.error("Voice edit failed:", error);
-                    } finally {
-                        setIsProcessing(false);
-                        isStoppingRef.current = false; // Reset stopping state
-                        resetTranscript();
+                if (transcript && transcript.trim()) {
+                    // 2. Process Edit
+                    console.log('[Voice Edit] Processing edit...');
+                    const updatedData = await processVoiceEdit(currentData, transcript, doctorProfile, language);
+                    if (updatedData) {
+                        onUpdate(updatedData);
                     }
-                };
-                process();
-            } else {
-                // Empty transcript, just reset
-                console.log('[Voice Edit] Empty transcript, skipping process');
-                isStoppingRef.current = false;
-                resetTranscript();
-            }
+                }
+
+                setIsProcessing(false);
+            };
+        } catch (error) {
+            console.error('[Voice Edit] Error processing audio:', error);
+            setIsProcessing(false);
         }
-    }, [isListening, transcript, currentData, doctorProfile, language, onUpdate, resetTranscript]);
+    };
 
     return {
-        // UI should reflect user intent (`isActive`) OR strict processing state
-        // We do NOT include `isListening` here to avoid the "lag" that causes double-clicks.
-        // If underlying hardware is still listening but user clicked stop, we show "Processing" or just "Active=False"
+        // Show as listening if we are active AND recording (syncs UI)
         isListening: isActive,
-        isProcessing: isProcessing || (isStoppingRef.current && !isActive), // Show processing if we are stopping or actually processing
-        interimTranscript,
-        toggleVoiceEdit: handleToggleListeningWithState,
-        transcript
+        isProcessing,
+        interimTranscript: isActive ? "Listening..." : "", // No real-time transcript with pure audio recorder
+        toggleVoiceEdit: handleToggleListening,
+        transcript: "" // Placeholder
     };
 };
