@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LanguageSelector } from './LanguageSelector';
 import { Icon } from './Icon';
+import toast from 'react-hot-toast';
 
 interface DashboardProps {
     onStartSession: (language: string) => void;
@@ -11,11 +12,63 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade }) => {
     const { user, logout } = useAuth();
     const [selectedLanguage, setSelectedLanguage] = React.useState("Automatic Language Detection");
+    const [showContactForm, setShowContactForm] = React.useState(false);
+    const [isSubmittingContact, setIsSubmittingContact] = React.useState(false);
+    const [contactForm, setContactForm] = React.useState({
+        name: '',
+        email: '',
+        phone: '',
+        clinic: '',
+        message: ''
+    });
 
     if (!user) return null;
 
     const isFreeTier = user.subscription_tier === 'free';
     const casesRemaining = isFreeTier ? Math.max(0, 10 - user.cases_today) : null;
+    const isLimitReached = isFreeTier && casesRemaining === 0;
+
+    useEffect(() => {
+        setContactForm(prev => ({
+            ...prev,
+            name: user.name || prev.name,
+            email: user.email || prev.email,
+            clinic: user.hospital_name || prev.clinic,
+            phone: user.phone || prev.phone
+        }));
+    }, [user]);
+
+    useEffect(() => {
+        if (isLimitReached) {
+            setShowContactForm(true);
+        }
+    }, [isLimitReached]);
+
+    const submitContactForm = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!contactForm.name || !contactForm.email || !contactForm.message) {
+            toast.error('Please fill name, email, and message.');
+            return;
+        }
+        setIsSubmittingContact(true);
+        try {
+            const response = await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(contactForm)
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'Failed to send');
+            }
+            toast.success('Thanks! We will reach out shortly.');
+            setContactForm(prev => ({ ...prev, message: '' }));
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to submit request');
+        } finally {
+            setIsSubmittingContact(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-[#F5F7FA] md:bg-slate-50">
@@ -153,12 +206,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                         <p className="text-2xl md:text-3xl font-bold text-[#1A1D23] md:text-slate-900">
                             {isFreeTier ? 'Free' : 'Premium'}
                         </p>
-                        {isFreeTier && onUpgrade && (
+                        {isFreeTier && (
                             <button
-                                onClick={onUpgrade}
+                                onClick={() => setShowContactForm(prev => !prev)}
                                 className="text-[11px] md:text-sm text-[#3B6FE0] md:text-blue-600 hover:text-blue-700 font-medium mt-1"
                             >
-                                Upgrade to Premium →
+                                {showContactForm ? 'Hide contact form' : 'Contact us for Premium →'}
                             </button>
                         )}
                     </div>
@@ -166,7 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
 
                 {/* Usage Limit Warning (Free Tier) */}
                 {isFreeTier && casesRemaining !== null && casesRemaining <= 2 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 md:mb-8">
                         <div className="flex items-start gap-3">
                             <span className="text-2xl">⚠️</span>
                             <div>
@@ -175,17 +228,95 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                                 </h3>
                                 <p className="text-sm text-amber-700 mb-2">
                                     {casesRemaining === 0
-                                        ? 'You\'ve reached your daily limit of 10 cases. Upgrade to Premium for unlimited access.'
+                                        ? 'You\'ve reached your daily limit of 10 cases. Contact us to unlock Premium.'
                                         : 'Upgrade to Premium for unlimited cases and priority support.'}
                                 </p>
-                                <button
-                                    onClick={onUpgrade}
-                                    className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
-                                >
-                                    Upgrade to Premium - ₹2000/month
-                                </button>
+                                {casesRemaining === 0 && (
+                                    <button
+                                        onClick={() => setShowContactForm(true)}
+                                        className="text-sm bg-[#3B6FE0] hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
+                                    >
+                                        Contact us to buy
+                                    </button>
+                                )}
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {isFreeTier && showContactForm && (
+                    <div className="bg-white rounded-[16px] md:rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.06)] md:shadow-sm p-4 md:p-6 mb-6 md:mb-8">
+                        <div className="flex items-start justify-between mb-4">
+                            <div>
+                                <h3 className="text-lg font-semibold text-[#1A1D23]">Contact us for Premium</h3>
+                                <p className="text-[12px] text-[#6B7280] md:text-sm">We will reach out with pricing and onboarding.</p>
+                            </div>
+                            <button
+                                onClick={() => setShowContactForm(false)}
+                                className="text-slate-400 hover:text-slate-600"
+                                aria-label="Close contact form"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <form onSubmit={submitContactForm} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] uppercase tracking-wider text-[#9CA3AF] mb-1">Name</label>
+                                <input
+                                    value={contactForm.name}
+                                    onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                                    className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-[#3B6FE0]"
+                                    placeholder="Dr. Name"
+                                />
+                            </div>
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] uppercase tracking-wider text-[#9CA3AF] mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    value={contactForm.email}
+                                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                                    className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-[#3B6FE0]"
+                                    placeholder="name@clinic.com"
+                                />
+                            </div>
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] uppercase tracking-wider text-[#9CA3AF] mb-1">Phone</label>
+                                <input
+                                    value={contactForm.phone}
+                                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                                    className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-[#3B6FE0]"
+                                    placeholder="+91..."
+                                />
+                            </div>
+                            <div className="md:col-span-1">
+                                <label className="block text-[10px] uppercase tracking-wider text-[#9CA3AF] mb-1">Clinic</label>
+                                <input
+                                    value={contactForm.clinic}
+                                    onChange={(e) => setContactForm({ ...contactForm, clinic: e.target.value })}
+                                    className="w-full min-h-[44px] rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-[#3B6FE0]"
+                                    placeholder="Clinic / Hospital"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-[10px] uppercase tracking-wider text-[#9CA3AF] mb-1">Message</label>
+                                <textarea
+                                    value={contactForm.message}
+                                    onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                                    className="w-full min-h-[96px] rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#3B6FE0] resize-none"
+                                    placeholder="Tell us about your clinic and needs."
+                                />
+                            </div>
+                            <div className="md:col-span-2 flex items-center gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingContact}
+                                    className="min-h-[44px] px-5 py-2 rounded-xl bg-[#3B6FE0] hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-60"
+                                >
+                                    {isSubmittingContact ? 'Sending...' : 'Send Request'}
+                                </button>
+                                <span className="text-[11px] text-[#9CA3AF]">We respond within 24 hours.</span>
+                            </div>
+                        </form>
                     </div>
                 )}
 
