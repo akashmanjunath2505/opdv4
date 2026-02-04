@@ -182,6 +182,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
     // NEW: Left Panel State
     const [activeTab, setActiveTab] = useState<'transcript' | 'checklist'>('transcript');
+    const [showTranscript, setShowTranscript] = useState(false);
     const [patient, setPatient] = useState<PatientDemographics>({
         name: '', age: '', sex: '', mobile: '', weight: '', height: '', bmi: '',
         date: new Date().toLocaleDateString('en-GB'),
@@ -538,6 +539,12 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         {phase === 'active' && <VoiceVisualizer isActive={true} />}
                     </div>
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowTranscript(prev => !prev)}
+                            className="min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 transition-all"
+                        >
+                            {showTranscript ? 'Hide Transcript' : 'Show Transcript'}
+                        </button>
                         {phase !== 'active' && (
                             <>
                                 <button onClick={toggleVoiceEdit} className={`min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-[#3B6FE0] text-white shadow-[0_0_12px_rgba(59,111,224,0.35)]' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-900'}`}>
@@ -553,11 +560,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                     </span>
                                 </button>
                             </>
-                        )}
-                        {phase === 'active' && (
-                            <button onClick={handleStopSession} className="min-h-[44px] px-4 py-2 bg-[#E8524A] hover:bg-[#E23F36] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95 whitespace-nowrap">
-                                Stop Session
-                            </button>
                         )}
                     </div>
                 </div>
@@ -622,60 +624,52 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             </div>
 
             {/* MIDDLE COLUMN: TRANSCRIPT (Independent Space) */}
-            <div className={`flex ${phase === 'active' ? 'flex-1' : 'w-full md:w-[380px]'} flex-col border-b md:border-b-0 md:border-r border-slate-200 bg-white transition-all duration-500`}>
+            {(phase === 'active' || showTranscript) && (
+                <div className={`flex ${phase === 'active' ? 'flex-1' : 'w-full md:w-[380px]'} flex-col border-b md:border-b-0 md:border-r border-slate-200 bg-white transition-all duration-500`}>
                 <div className="h-14 md:h-16 flex items-center px-4 md:px-6 border-b border-slate-200">
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#3B6FE0] md:text-blue-600">Transcript</span>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                    {transcriptHistory.length === 0 && !transcript && !interimTranscript && (
-                        <div className="flex flex-col items-center justify-center h-full opacity-60 min-h-[300px]">
-                            {phase === 'active' && isListening ? (
-                                <>
-                                    <VoiceVisualizer isActive={true} size="large" />
-                                    <p className="text-[11px] uppercase tracking-[0.3em] text-[#7C5CFC] md:text-blue-600 mt-8 animate-pulse font-bold">Listening...</p>
-                                    <p className="text-[11px] text-[#6B7280] md:text-slate-500 mt-2">Speak clearly into the microphone</p>
-                                </>
-                            ) : (
-                                <>
+                    {phase === 'active' ? (
+                        <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center">
+                            <VoiceVisualizer isActive={true} size="large" />
+                            <p className="text-[11px] uppercase tracking-[0.3em] text-[#7C5CFC] md:text-blue-600 mt-6 animate-pulse font-bold">Listening...</p>
+                            <p className="text-[11px] text-[#6B7280] md:text-slate-500 mt-2">Speak clearly into the microphone</p>
+                            <button
+                                onClick={handleStopSession}
+                                className="mt-6 min-h-[44px] px-6 py-3 bg-[#E8524A] hover:bg-[#E23F36] text-white rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95"
+                            >
+                                Stop Session
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            {transcriptHistory.length === 0 && (
+                                <div className="flex flex-col items-center justify-center h-full opacity-60 min-h-[300px]">
                                     <Icon name="message" className="w-12 h-12 mb-4 text-slate-300" />
                                     <p className="text-[10px] uppercase tracking-widest text-slate-400">No Speech Detected</p>
-                                </>
+                                </div>
                             )}
-                        </div>
+
+                            {/* Backend History */}
+                            {transcriptHistory.map(entry => (
+                                <div key={entry.id} className={`max-w-[90%] ${entry.speaker === 'Doctor' ? 'self-end ml-auto' : 'self-start mr-auto'}`}>
+                                    <div className={`text-[9px] uppercase font-bold mb-1.5 ${entry.speaker === 'Doctor' ? 'text-right text-blue-600' : 'text-left text-slate-500'}`}>{entry.speaker}</div>
+                                    <div className={`p-4 rounded-2xl text-xs leading-relaxed ${entry.speaker === 'Doctor'
+                                        ? 'bg-blue-50 border border-blue-100 text-blue-900 rounded-tr-none'
+                                        : 'bg-slate-100 border border-slate-200 text-slate-700 rounded-tl-none'
+                                        }`}>
+                                        {entry.text}
+                                    </div>
+                                </div>
+                            ))}
+
+                            <div ref={transcriptEndRef} />
+                        </>
                     )}
-
-                    {/* Backend History */}
-                    {transcriptHistory.map(entry => (
-                        <div key={entry.id} className={`max-w-[90%] ${entry.speaker === 'Doctor' ? 'self-end ml-auto' : 'self-start mr-auto'}`}>
-                            <div className={`text-[9px] uppercase font-bold mb-1.5 ${entry.speaker === 'Doctor' ? 'text-right text-blue-600' : 'text-left text-slate-500'}`}>{entry.speaker}</div>
-                            <div className={`p-4 rounded-2xl text-xs leading-relaxed ${entry.speaker === 'Doctor'
-                                ? 'bg-blue-50 border border-blue-100 text-blue-900 rounded-tr-none'
-                                : 'bg-slate-100 border border-slate-200 text-slate-700 rounded-tl-none'
-                                }`}>
-                                {entry.text}
-                            </div>
-                        </div>
-                    ))}
-
-                    {/* Local Real-time Transcript (Showcase) */}
-                    {transcript && (
-                        <div className="max-w-[90%] self-end ml-auto">
-                            <div className="text-[9px] uppercase font-bold mb-1.5 text-right text-blue-600">Live Stream</div>
-                            <div className="p-4 rounded-2xl text-xs leading-relaxed bg-blue-50 border border-blue-100 text-blue-900 rounded-tr-none animate-fadeIn">
-                                {transcript}
-                            </div>
-                        </div>
-                    )}
-
-                    <div ref={transcriptEndRef} />
-                    {interimTranscript && (
-                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl text-blue-800/70 text-sm animate-pulse">
-                            {interimTranscript}
-                        </div>
-                    )}
-
                 </div>
             </div>
+            )}
 
             {/* RIGHT PANEL: MAIN EDITOR (Bigger Focus) */}
             <div className={`flex ${phase === 'active' ? 'md:w-[450px]' : 'flex-1'} w-full flex-col relative bg-[#F5F7FA] md:bg-slate-50 transition-all duration-500`}>
@@ -691,6 +685,13 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowTranscript(prev => !prev)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all"
+                        >
+                            <Icon name="document-text" className="w-4 h-4" />
+                            <span className="hidden lg:inline">{showTranscript ? 'Hide Transcript' : 'Show Transcript'}</span>
+                        </button>
                         {isVoiceEditing && (
                             <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-lg animate-fadeIn">
                                 <Icon name="microphone" className="w-3 h-3 text-purple-400 animate-pulse" />
