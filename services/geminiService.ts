@@ -270,8 +270,12 @@ export const generateClinicalNote = async (
     
     GENERATION RULES:
   1. ** Cleanup First **: Internally clean the transcript to remove fillers and correct medical terms before extraction.
-    2. ** Subjective **: Summarize patient's complaints/symptoms.
-  3. ** Objective **: Summarize physical findings. ** CRITICAL **: Always include units and symbols for all measurements:
+    2. ** Subjective **: Summarize patient's complaints/symptoms and history. If available, structure it with short labels like:
+       - "History:"
+       - "Past Medical History:"
+       - "Past Investigations/Records:"
+       IMPORTANT: Any lab value/investigation/report mentioned as being done in the past MUST be placed under "Past Investigations/Records" (or "Past Medical History"), NOT in Objective.
+    3. ** Objective (Clinical Findings/Examination) **: Only include measurements or observations from the CURRENT visit. Do NOT include past investigations. ** CRITICAL **: Always include units and symbols for all measurements:
     - Blood Pressure: "BP: 120/80 mmHg"
       - Temperature: "Temp: 98.6°F" or "37°C"
         - Heart Rate: "HR: 72 bpm" or "Pulse: 72/min"
@@ -281,9 +285,14 @@ export const generateClinicalNote = async (
                 - Height: "Height: 170 cm"
                   - Any other measurements with appropriate units
   4. ** Assessment **: Leave as empty string "".
-    5. ** Differential Diagnosis **: Primary Diagnosis followed by other potential diagnoses considered.
-    6. ** Lab Results **: Any tests, vitals, or investigations mentioned.
+    5. ** Differential Diagnosis **: Primary diagnosis followed by other potential diagnoses considered. Apply the following reasoning rules:
+       - Symptom Classification: Label key symptoms as Typical or Atypical based on history details (location, radiation, exertion, associated symptoms).
+       - If symptoms are atypical but risk factors are significant, use: "Atypical [symptom]; [serious etiology] to be ruled out given risk factors."
+       - Avoid contradictions (e.g., do not call symptoms typical if history is atypical).
+       - Preserve clinical reasoning: low red flags ≠ no risk; risk factors modify concern, not symptom type.
+    6. ** Lab Results **: Only include tests/vitals/investigations performed or reported in the CURRENT visit. Past results must be in Subjective under "Past Investigations/Records".
     7. ** Advice **: Diet, lifestyle, follow - up instructions(excluding medicines).
+    8. ** Default Principle **: Prioritize clinical accuracy > completeness > verbosity when unsure.
     
     PRESCRIPTION RULES(Critical):
   1. EXTRAPOLATE NOTHING.Only extract drugs explicitly mentioned.
@@ -442,7 +451,10 @@ export const processVoiceEdit = async (
        - \`REMOVE\`: When user says "Delete", "Remove", "No, not that".
 
     **CLINICAL LOGIC RULES**:
+    - **Time Awareness**: Only include CURRENT visit findings in \`objective\`. Past labs/investigations belong in \`subjective\` under "Past Investigations/Records" (or "Past Medical History").
     - **Symptom vs. Diagnosis**: If the doctor says "Patient has Diabetes", that is a **Diagnosis** (\`differentialDiagnosis\`). If they say "Patient has a headache", that is a **Symptom** (\`subjective\`). Use your medical knowledge.
+    - **Symptom Classification**: If a symptom is described (e.g., chest discomfort), label it as Typical or Atypical based on history details. If atypical with significant risk factors, ensure assessment uses: "Atypical [symptom]; [serious etiology] to be ruled out given risk factors."
+    - **Preserve Reasoning**: Low immediate red flags ≠ no risk. Risk factors modify concern, not symptom type.
     - **Implicit Context**: If the command is "Make it 500mg", assume they are talking about the *last added medicine*.
     - **Formatting**: Ensure your \`value\` output is clean, capitalized, and professional (e.g., "diabetes" -> "Type 2 Diabetes Mellitus" if appropriate context allows, otherwise keep it faithful).
     - **Clinical Findings with Units**: When adding/updating \`objective\` field, ALWAYS include proper units:
