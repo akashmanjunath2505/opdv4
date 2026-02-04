@@ -30,7 +30,7 @@ const VoiceVisualizer: React.FC<{ isActive: boolean; size?: 'small' | 'large' }>
             {[...Array(barCount)].map((_, i) => (
                 <div
                     key={i}
-                    className={`${barWidthClass} rounded-full transition-all duration-300 ${isActive ? 'bg-aivana-accent animate-wave' : 'bg-gray-600'}`}
+                    className={`${barWidthClass} rounded-full transition-all duration-300 ${isActive ? 'bg-[#7C5CFC] md:bg-aivana-accent animate-wave' : 'bg-slate-400 md:bg-gray-600'}`}
                     style={{
                         height: isActive ? `${Math.max(15, 30 + Math.random() * 70)}%` : '4px',
                         opacity: isActive ? 0.8 + Math.random() * 0.2 : 0.3,
@@ -173,7 +173,7 @@ const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptio
 
 export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSession, doctorProfile, language: defaultLanguage }) => {
     const { refreshUser } = useAuth();
-    const [phase, setPhase] = useState<'consent' | 'active' | 'processing' | 'review'>('consent');
+    const [phase, setPhase] = useState<'consent' | 'active' | 'processing' | 'review'>('active');
     const [sessionLanguage, setSessionLanguage] = useState(defaultLanguage || "Automatic Language Detection");
     const [transcriptHistory, setTranscriptHistory] = useState<TranscriptEntry[]>([]);
     const [clinicalNote, setClinicalNote] = useState('');
@@ -182,9 +182,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
     // NEW: Left Panel State
     const [activeTab, setActiveTab] = useState<'transcript' | 'checklist'>('transcript');
-    // Mobile Tab State
-    const [mobileTab, setMobileTab] = useState<'session' | 'editor'>('session');
-
     const [patient, setPatient] = useState<PatientDemographics>({
         name: '', age: '', sex: '', mobile: '', weight: '', height: '', bmi: '',
         date: new Date().toLocaleDateString('en-GB'),
@@ -212,6 +209,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const transcriptHistoryRef = useRef<TranscriptEntry[]>([]);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const transcriptEndRef = useRef<HTMLDivElement>(null);
+    const hasStartedRef = useRef(false);
 
     const { isRecording, startRecording, stopRecording } = useAudioRecorder();
     const { startListening, stopListening, interimTranscript, transcript, resetTranscript, isListening } = useSpeechRecognition({ lang: sessionLanguage });
@@ -321,7 +319,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             console.log('✅ Session created in database:', session.data.id);
 
             setPhase('active');
-            setMobileTab('session'); // Auto-switch to Live tab on start
             setDuration(0);
             setTranscriptHistory([]);
             transcriptHistoryRef.current = [];
@@ -344,7 +341,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             console.error('Failed to create session:', error);
             // Continue anyway with local-only mode
             setPhase('active');
-            setMobileTab('session'); // Auto-switch to Live tab on start (fallback)
             setDuration(0);
             setTranscriptHistory([]);
             transcriptHistoryRef.current = [];
@@ -366,10 +362,15 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         }
     }, [patient, startRecording, startListening, processSegment, resetTranscript]);
 
+    useEffect(() => {
+        if (hasStartedRef.current) return;
+        hasStartedRef.current = true;
+        handleStartSession();
+    }, [handleStartSession]);
+
     const handleStopSession = useCallback(async () => {
         stopListening();
         setPhase('processing');
-        setMobileTab('editor'); // Auto-switch to Rx tab on stop to show results immediately
         const finalBlob = await stopRecording();
         if (finalBlob) {
             const idx = pendingSegmentsQueue.current.length;
@@ -509,39 +510,65 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     const completedCount = checklistItems.filter(i => i.valid).length;
     const progressPercent = Math.round((completedCount / checklistItems.length) * 100);
 
-    if (phase === 'consent') return (
-        <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
-            <div className="bg-white p-12 rounded-[40px] border border-slate-200 max-w-lg w-full text-center shadow-xl">
-                <h2 className="text-3xl font-bold text-slate-900 mb-8">Veda Assistant</h2>
-                <button onClick={handleStartSession} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold text-xl hover:scale-105 transition-transform shadow-lg shadow-blue-600/20">Start Session</button>
-            </div>
-        </div>
-    );
-
     return (
-        <div className="flex-1 flex bg-slate-50 overflow-hidden h-screen font-sans">
+        <div className="flex-1 flex flex-col md:flex-row bg-[#F5F7FA] md:bg-slate-50 overflow-y-auto md:overflow-hidden min-h-screen md:h-screen font-sans pt-28 md:pt-0 pb-10 md:pb-0">
             <style>{`
                 @keyframes wave { 0%, 100% { height: 20%; opacity: 0.5; } 50% { height: 100%; opacity: 1; } }
                 .animate-wave { animation: wave 1s ease-in-out infinite; }
             `}</style>
-
-            {/* MOBILE TABS (Bottom Interaction Bar) */}
-            <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 p-1.5 bg-white/80 backdrop-blur-xl border border-slate-200 rounded-full shadow-2xl ring-1 ring-slate-200">
-                <button
-                    onClick={() => setMobileTab('session')}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${mobileTab === 'session' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25' : 'text-slate-500 hover:text-slate-900'}`}
-                >
-                    <Icon name="microphone" className="w-4 h-4" />
-                    <span>Live</span>
-                </button>
-                <div className="w-px h-4 bg-slate-200 mx-1"></div>
-                <button
-                    onClick={() => setMobileTab('editor')}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${mobileTab === 'editor' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25' : 'text-slate-500 hover:text-slate-900'}`}
-                >
-                    <Icon name="document-text" className="w-4 h-4" />
-                    <span>Rx</span>
-                </button>
+            {/* MOBILE TOP STRIP */}
+            <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
+                <div className="px-4 pt-3 pb-2">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-[9px] uppercase tracking-[0.25em] text-[#9CA3AF]">Doctor</div>
+                            <div className="text-sm font-semibold text-[#1A1D23]">Dr. {doctorProfile?.name || "Sharma"} (MBBS)</div>
+                            <div className="text-[11px] text-[#6B7280]">General Medicine</div>
+                        </div>
+                        <div className="text-[#3B6FE0] text-sm font-bold">{progressPercent}%</div>
+                    </div>
+                </div>
+                <div className="px-4 pb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${phase === 'active' ? 'bg-[#E8524A]/10 border-[#E8524A]/30 text-[#E8524A]' : 'bg-[#22C55E]/10 border-[#22C55E]/30 text-[#22C55E]'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${phase === 'active' ? 'bg-[#E8524A] animate-pulse' : 'bg-[#22C55E]'}`}></div>
+                            {phase === 'active' ? 'REC' : 'STANDBY'}
+                        </div>
+                        <span className="text-sm font-medium text-[#1A1D23] tabular-nums">{formatTime(duration)}</span>
+                        {phase === 'active' && <VoiceVisualizer isActive={true} />}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {phase !== 'active' && (
+                            <>
+                                <button onClick={toggleVoiceEdit} className={`min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-[#3B6FE0] text-white shadow-[0_0_12px_rgba(59,111,224,0.35)]' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-900'}`}>
+                                    <span className="flex items-center gap-2">
+                                        <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-4 h-4 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
+                                        Voice Edit
+                                    </span>
+                                </button>
+                                <button onClick={() => setShowPdfPreview(!showPdfPreview)} className="min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 transition-all">
+                                    <span className="flex items-center gap-2">
+                                        <Icon name="document-text" className="w-4 h-4" />
+                                        PDF
+                                    </span>
+                                </button>
+                            </>
+                        )}
+                        {phase === 'active' && (
+                            <button onClick={handleStopSession} className="min-h-[44px] px-4 py-2 bg-[#E8524A] hover:bg-[#E23F36] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95 whitespace-nowrap">
+                                Stop Session
+                            </button>
+                        )}
+                    </div>
+                </div>
+                {isVoiceEditing && phase !== 'active' && (
+                    <div className="px-4 pb-3">
+                        <div className="inline-flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                            <Icon name="microphone" className="w-3 h-3 text-purple-500 animate-pulse" />
+                            <span className="text-[10px] text-purple-600 font-medium">Listening...</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* LEFT SIDEBAR: SESSION INFO */}
@@ -595,19 +622,18 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             </div>
 
             {/* MIDDLE COLUMN: TRANSCRIPT (Independent Space) */}
-            {/* Visible if mobileTab === 'session' OR screen is desktop */}
-            <div className={`${mobileTab === 'session' ? 'flex' : 'hidden'} md:flex ${phase === 'active' ? 'flex-1' : 'w-full md:w-[380px]'} flex-col border-r border-slate-200 bg-white transition-all duration-500`}>
-                <div className="h-16 flex items-center px-6 border-b border-slate-200">
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Transcript</span>
+            <div className={`flex ${phase === 'active' ? 'flex-1' : 'w-full md:w-[380px]'} flex-col border-b md:border-b-0 md:border-r border-slate-200 bg-white transition-all duration-500`}>
+                <div className="h-14 md:h-16 flex items-center px-4 md:px-6 border-b border-slate-200">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#3B6FE0] md:text-blue-600">Transcript</span>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                     {transcriptHistory.length === 0 && !transcript && !interimTranscript && (
                         <div className="flex flex-col items-center justify-center h-full opacity-60 min-h-[300px]">
-                            {isListening ? (
+                            {phase === 'active' && isListening ? (
                                 <>
                                     <VoiceVisualizer isActive={true} size="large" />
-                                    <p className="text-xs uppercase tracking-[0.2em] text-blue-600 mt-8 animate-pulse font-bold">Listening...</p>
-                                    <p className="text-[10px] text-slate-500 mt-2">Speak clearly into the microphone</p>
+                                    <p className="text-[11px] uppercase tracking-[0.3em] text-[#7C5CFC] md:text-blue-600 mt-8 animate-pulse font-bold">Listening...</p>
+                                    <p className="text-[11px] text-[#6B7280] md:text-slate-500 mt-2">Speak clearly into the microphone</p>
                                 </>
                             ) : (
                                 <>
@@ -648,26 +674,13 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         </div>
                     )}
 
-                    {/* Mobile Stop Transcription Button (Floating) */}
-                    {isListening && phase === 'active' && (
-                        <div className="md:hidden sticky bottom-4 flex justify-center pb-20 pointer-events-none">
-                            <button
-                                onClick={onEndSession} // Assuming onEndSession handles stopping; if there's a specific simple stop, use that. Usually 'stopRecording' triggers processing phase.
-                                className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-full font-bold shadow-lg shadow-red-500/30 hover:bg-red-600 transition-transform active:scale-95 animate-fadeInUp"
-                            >
-                                <Icon name="stopCircle" className="w-5 h-5" />
-                                <span>Stop Transcription</span>
-                            </button>
-                        </div>
-                    )}
                 </div>
             </div>
 
             {/* RIGHT PANEL: MAIN EDITOR (Bigger Focus) */}
-            {/* Visible if mobileTab === 'editor' OR screen is desktop */}
-            <div className={`${mobileTab === 'editor' ? 'flex' : 'hidden'} md:flex ${phase === 'active' ? 'md:w-[450px]' : 'flex-1'} w-full flex-col relative bg-slate-50 transition-all duration-500`}>
+            <div className={`flex ${phase === 'active' ? 'md:w-[450px]' : 'flex-1'} w-full flex-col relative bg-[#F5F7FA] md:bg-slate-50 transition-all duration-500`}>
                 {/* Header Bar */}
-                <header className="h-16 border-b border-slate-200 bg-white px-4 flex items-center justify-between">
+                <header className="hidden md:flex h-16 border-b border-slate-200 bg-white px-4 items-center justify-between">
                     <div className={`flex items-center gap-${phase === 'active' ? '2' : '6'}`}>
                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${phase === 'active' ? 'bg-red-500/10 border-red-500/30 text-red-500' : 'bg-green-500/10 border-green-500 text-green-600'}`}>
                             <div className={`w-1.5 h-1.5 rounded-full ${phase === 'active' ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
@@ -726,7 +739,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 </header>
                 {/* Active Recording Placeholder */}
                 {phase === 'active' && (
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 text-center">
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#F5F7FA] md:bg-slate-50 text-center min-h-[260px]">
                         <div className="w-20 h-20 mb-6 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
                             <Icon name="microphone" className="w-8 h-8 text-red-500" />
                         </div>
@@ -738,67 +751,84 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 )}
 
                 {/* Main Editor Canvas */}
-                <div className={`flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50 ${phase === 'active' ? 'hidden' : 'block'}`}>
+                <div className={`flex-1 overflow-y-auto p-5 md:p-8 bg-[#F5F7FA] md:bg-slate-50 ${phase === 'active' ? 'hidden' : 'block'}`}>
                     <div className="max-w-4xl mx-auto space-y-8">
 
                         {/* Patient Info Card */}
-                        <div className="p-5 rounded-2xl bg-white border border-slate-200 grid grid-cols-4 gap-6 shadow-sm">
-                            <div className="col-span-2 space-y-1">
-                                <label className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Patient Name</label>
-                                <input value={patient.name} onChange={e => setPatient({ ...patient, name: e.target.value })} className="w-full bg-transparent text-lg font-medium text-slate-900 placeholder-slate-400 outline-none border-b border-transparent focus:border-blue-600 transition-colors" placeholder="Enter Name..." />
+                        <div className="p-5 rounded-2xl bg-white border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 shadow-sm">
+                            <div className="col-span-1 md:col-span-2 space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-[#9CA3AF] tracking-wider">Patient Name</label>
+                                <input value={patient.name} onChange={e => setPatient({ ...patient, name: e.target.value })} className="w-full bg-transparent text-base md:text-lg font-medium text-[#1A1D23] placeholder-slate-400 outline-none border-b border-transparent focus:border-[#3B6FE0] md:focus:border-blue-600 transition-colors py-2" placeholder="Enter Name..." />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Age</label>
-                                <input value={patient.age} onChange={e => setPatient({ ...patient, age: e.target.value })} className="w-full bg-transparent text-slate-900 outline-none placeholder-slate-400" placeholder="--" />
+                                <label className="text-[10px] uppercase font-bold text-[#9CA3AF] tracking-wider">Age</label>
+                                <input value={patient.age} onChange={e => setPatient({ ...patient, age: e.target.value })} className="w-full bg-transparent text-[#1A1D23] text-base outline-none placeholder-slate-400 py-2" placeholder="--" />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Sex</label>
-                                <select value={patient.sex} onChange={e => setPatient({ ...patient, sex: e.target.value })} className="w-full bg-transparent text-slate-900 outline-none appearance-none"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select>
+                                <label className="text-[10px] uppercase font-bold text-[#9CA3AF] tracking-wider">Sex</label>
+                                <select value={patient.sex} onChange={e => setPatient({ ...patient, sex: e.target.value })} className="w-full bg-transparent text-[#1A1D23] text-base outline-none appearance-none py-2"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select>
                             </div>
                         </div>
 
                         {/* Editor Grid */}
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Chief Complaint</label>
-                                <textarea value={prescriptionData.subjective} onChange={e => setPrescriptionData({ ...prescriptionData, subjective: e.target.value })} className="w-full h-32 bg-white border border-slate-200 rounded-xl p-4 text-slate-900 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all resize-none placeholder-slate-400" placeholder="Patient's primary complaints..." />
+                                <label className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest">Chief Complaint</label>
+                                <textarea value={prescriptionData.subjective} onChange={e => setPrescriptionData({ ...prescriptionData, subjective: e.target.value })} className="w-full h-32 bg-white border border-slate-200 rounded-xl p-4 text-[#1A1D23] text-base md:text-sm outline-none focus:border-[#3B6FE0] md:focus:border-blue-600 focus:ring-1 focus:ring-[#3B6FE0] md:focus:ring-blue-600 transition-all resize-none placeholder-slate-400" placeholder="Patient's primary complaints..." />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Clinical Findings</label>
-                                <textarea value={prescriptionData.objective} onChange={e => setPrescriptionData({ ...prescriptionData, objective: e.target.value })} className="w-full h-32 bg-white border border-slate-200 rounded-xl p-4 text-slate-900 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all resize-none placeholder-slate-400" placeholder="Observations found..." />
+                                <label className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest">Clinical Findings</label>
+                                <textarea value={prescriptionData.objective} onChange={e => setPrescriptionData({ ...prescriptionData, objective: e.target.value })} className="w-full h-32 bg-white border border-slate-200 rounded-xl p-4 text-[#1A1D23] text-base md:text-sm outline-none focus:border-[#3B6FE0] md:focus:border-blue-600 focus:ring-1 focus:ring-[#3B6FE0] md:focus:ring-blue-600 transition-all resize-none placeholder-slate-400" placeholder="Observations found..." />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Differential Diagnosis</label>
-                            <input value={prescriptionData.differentialDiagnosis} onChange={e => setPrescriptionData({ ...prescriptionData, differentialDiagnosis: e.target.value })} className="w-full bg-white border border-slate-200 rounded-xl p-4 text-slate-900 text-lg font-medium outline-none focus:border-blue-600 transition-all placeholder-slate-400" placeholder="Enter Differential Diagnosis..." />
+                            <label className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest">Differential Diagnosis</label>
+                            <input value={prescriptionData.differentialDiagnosis} onChange={e => setPrescriptionData({ ...prescriptionData, differentialDiagnosis: e.target.value })} className="w-full bg-white border border-slate-200 rounded-xl p-4 text-[#1A1D23] text-base md:text-lg font-medium outline-none focus:border-[#3B6FE0] md:focus:border-blue-600 transition-all placeholder-slate-400" placeholder="Enter Differential Diagnosis..." />
                         </div>
 
                         {/* Medicines */}
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Medicines</label>
-                                <button onClick={() => setPrescriptionData({ ...prescriptionData, medicines: [...prescriptionData.medicines, { name: '', dosage: '', frequency: '', route: '' }] })} className="text-[9px] font-bold uppercase bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">+ Add Drug</button>
+                                <label className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest">Medicines</label>
+                                <button onClick={() => setPrescriptionData({ ...prescriptionData, medicines: [...prescriptionData.medicines, { name: '', dosage: '', frequency: '', route: '' }] })} className="w-full md:w-auto text-[11px] font-bold uppercase bg-blue-50 text-[#3B6FE0] md:text-blue-600 px-4 py-3 md:py-1.5 rounded-xl hover:bg-blue-100 transition-colors min-h-[44px] flex items-center justify-center">+ Add Drug</button>
                             </div>
                             <div className="grid gap-3">
                                 {prescriptionData.medicines.map((med, i) => (
-                                    <div key={i} className="grid grid-cols-12 gap-2 bg-white p-2 rounded-lg border border-slate-200 items-center shadow-sm">
-                                        <input value={med.name} onChange={e => { const m = [...prescriptionData.medicines]; m[i].name = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="col-span-4 bg-transparent text-slate-900 text-sm border-b border-slate-100 focus:border-blue-600 px-2 outline-none placeholder-slate-400" placeholder="Drug Name" />
-                                        <input value={med.dosage} onChange={e => { const m = [...prescriptionData.medicines]; m[i].dosage = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="col-span-3 bg-transparent text-slate-900 text-sm border-b border-slate-100 focus:border-blue-600 px-2 outline-none placeholder-slate-400" placeholder="Dosage" />
-                                        <input value={med.frequency} onChange={e => { const m = [...prescriptionData.medicines]; m[i].frequency = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="col-span-3 bg-transparent text-slate-900 text-sm border-b border-slate-100 focus:border-blue-600 px-2 outline-none placeholder-slate-400" placeholder="Freq" />
-                                        <div className="col-span-2 flex items-center gap-1">
-                                            <input value={med.route} onChange={e => { const m = [...prescriptionData.medicines]; m[i].route = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="w-full bg-transparent text-slate-900 text-sm border-b border-slate-100 focus:border-blue-600 px-2 outline-none placeholder-slate-400" placeholder="Route" />
-                                            <button onClick={() => { const m = prescriptionData.medicines.filter((_, idx) => idx !== i); setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="text-red-500 hover:text-red-400 p-1 rounded">×</button>
+                                    <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm md:grid md:grid-cols-12 md:gap-2 md:p-2 md:items-center">
+                                        {/* Mobile: Stacked | Desktop: Grid */}
+                                        <div className="mb-3 md:mb-0 md:col-span-4">
+                                            <label className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Drug Name</label>
+                                            <input value={med.name} onChange={e => { const m = [...prescriptionData.medicines]; m[i].name = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="w-full bg-transparent text-slate-900 text-base md:text-sm border-b border-slate-100 focus:border-blue-600 px-2 outline-none placeholder-slate-400 py-2 md:py-0" placeholder="Drug Name" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4 mb-3 md:mb-0 md:contents">
+                                            <div className="md:col-span-3">
+                                                <label className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Dosage</label>
+                                                <input value={med.dosage} onChange={e => { const m = [...prescriptionData.medicines]; m[i].dosage = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="w-full bg-transparent text-slate-900 text-base md:text-sm border-b border-slate-100 focus:border-blue-600 px-2 outline-none placeholder-slate-400 py-2 md:py-0" placeholder="Dosage" />
+                                            </div>
+                                            <div className="md:col-span-3">
+                                                <label className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Frequency</label>
+                                                <input value={med.frequency} onChange={e => { const m = [...prescriptionData.medicines]; m[i].frequency = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="w-full bg-transparent text-slate-900 text-base md:text-sm border-b border-slate-100 focus:border-blue-600 px-2 outline-none placeholder-slate-400 py-2 md:py-0" placeholder="Freq" />
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-2 flex items-center gap-2">
+                                            <div className="flex-1">
+                                                <label className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Route</label>
+                                                <input value={med.route} onChange={e => { const m = [...prescriptionData.medicines]; m[i].route = e.target.value; setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="w-full bg-transparent text-slate-900 text-base md:text-sm border-b border-slate-100 focus:border-blue-600 px-2 outline-none placeholder-slate-400 py-2 md:py-0" placeholder="Route" />
+                                            </div>
+                                            <button onClick={() => { const m = prescriptionData.medicines.filter((_, idx) => idx !== i); setPrescriptionData({ ...prescriptionData, medicines: m }) }} className="text-red-500 hover:text-red-400 p-2 md:p-1 rounded-full hover:bg-red-50 transition-colors mt-auto md:mt-0">
+                                                <Icon name="close" className="w-5 h-5" />
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
-                                {prescriptionData.medicines.length === 0 && <div className="text-center p-6 border border-dashed border-slate-300 rounded-xl text-slate-500 text-xs">No medicines prescribed via voice yet.</div>}
+                                {prescriptionData.medicines.length === 0 && <div className="text-center p-6 border border-dashed border-slate-300 rounded-xl text-[#6B7280] text-xs italic">No medicines prescribed via voice yet.</div>}
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Advice</label>
-                            <textarea value={prescriptionData.advice} onChange={e => setPrescriptionData({ ...prescriptionData, advice: e.target.value })} className="w-full h-24 bg-white border border-slate-200 rounded-xl p-4 text-slate-900 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all resize-none placeholder-slate-400" placeholder="Instructions for patient..." />
+                            <label className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-widest">Advice</label>
+                            <textarea value={prescriptionData.advice} onChange={e => setPrescriptionData({ ...prescriptionData, advice: e.target.value })} className="w-full h-24 bg-white border border-slate-200 rounded-xl p-4 text-[#1A1D23] text-sm outline-none focus:border-[#3B6FE0] md:focus:border-blue-600 focus:ring-1 focus:ring-[#3B6FE0] md:focus:ring-blue-600 transition-all resize-none placeholder-slate-400" placeholder="Instructions for patient..." />
                         </div>
 
 
@@ -807,17 +837,21 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
                 {/* Processing Overlay */}
                 {phase === 'processing' && (
-                    <div className="absolute inset-0 bg-slate-50/90 backdrop-blur-md flex flex-col items-center justify-center z-50">
-                        <div className="w-16 h-16 border-t-2 border-blue-600 rounded-full animate-spin mb-4"></div>
-                        <h2 className="text-2xl font-bold text-slate-800 tracking-widest uppercase">Processing Session</h2>
+                    <div className="absolute inset-0 bg-[#111]/90 md:bg-slate-50/90 backdrop-blur-md flex flex-col items-center justify-center z-50">
+                        <div className="w-16 h-16 border-t-2 border-[#7C5CFC] md:border-blue-600 rounded-full animate-spin mb-4"></div>
+                        <h2 className="text-xl md:text-2xl font-bold text-white md:text-slate-800 tracking-widest uppercase">Processing Session</h2>
+                        <div className="md:hidden absolute top-4 right-4 bg-white rounded-lg shadow-lg border border-slate-200 px-3 py-2 flex items-center gap-2 animate-fadeIn">
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            <span className="text-[11px] text-slate-700 font-medium">Welcome back!</span>
+                        </div>
                     </div>
                 )}
 
                 {/* PDF Preview Modal */}
                 {showPdfPreview && (
-                    <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 md:p-8" onClick={() => setShowPdfPreview(false)}>
-                        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+                    <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-8" onClick={() => setShowPdfPreview(false)}>
+                        <div className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full h-full md:max-w-4xl md:max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between md:rounded-t-2xl z-10">
                                 <h3 className="text-lg font-bold text-slate-900">Prescription Preview</h3>
                                 <div className="flex items-center gap-3">
                                     <button
@@ -830,7 +864,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                                 toast.error(error.message || "Failed to update case count");
                                             }
                                         }}
-                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-blue-600/20"
+                                        className="flex items-center gap-2 px-4 py-2 bg-[#3B6FE0] md:bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-blue-600/20"
                                     >
                                         <Icon name="download" className="w-4 h-4" />
                                         <span>Download PDF</span>
@@ -840,7 +874,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                     </button>
                                 </div>
                             </div>
-                            <div className="p-6">
+                            <div className="p-4 md:p-6">
                                 <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview />
                             </div>
                         </div>
