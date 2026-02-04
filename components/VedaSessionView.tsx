@@ -48,7 +48,20 @@ const stripMarkdown = (text: string): string => {
     return text.replace(/^[#\s*+-]+/gm, '').replace(/[*_]{1,2}/g, '').trim();
 };
 
-const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptionData: PrescriptionData; isPreview?: boolean }> = ({ patient, prescriptionData, isPreview }) => {
+const PrescriptionTemplate: React.FC<{
+    patient: PatientDemographics;
+    prescriptionData: PrescriptionData;
+    doctorProfile?: DoctorProfile;
+    doctorMeta?: {
+        name?: string;
+        qualification?: string;
+        registrationNumber?: string;
+        hospitalName?: string;
+        hospitalAddress?: string;
+        hospitalPhone?: string;
+    };
+    isPreview?: boolean;
+}> = ({ patient, prescriptionData, doctorProfile, doctorMeta, isPreview }) => {
     const containerClass = isPreview
         ? "w-full bg-white text-black p-6 rounded-lg shadow-inner overflow-hidden border border-gray-200"
         : "printable-area p-8 bg-white text-black relative";
@@ -56,21 +69,27 @@ const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptio
     const baseFontSize = isPreview ? 'text-[10px]' : 'text-[12.5px]';
     const headerTitleSize = isPreview ? 'text-[15px]' : 'text-[22px]';
     const metaLabelSize = isPreview ? 'text-[9.5px]' : 'text-[12.5px]';
+    const doctorName = doctorMeta?.name || doctorProfile?.name || "Doctors Name";
+    const doctorQualification = doctorMeta?.qualification || doctorProfile?.qualification || "Qualification";
+    const doctorRegNo = doctorMeta?.registrationNumber || "";
+    const hospitalName = doctorMeta?.hospitalName || patient.hospitalName;
+    const hospitalAddress = doctorMeta?.hospitalAddress || patient.hospitalAddress;
+    const hospitalPhone = doctorMeta?.hospitalPhone || patient.hospitalPhone;
 
     return (
         <div className={containerClass} style={{ fontFamily: 'Arial, Helvetica, "Noto Sans Devanagari", sans-serif' }}>
             {/* Header Branding */}
             <div className="flex justify-between items-start mb-1" style={{ breakInside: 'avoid' }}>
                 <div className="flex-1">
-                    <div className={`${headerTitleSize} font-bold leading-tight uppercase`}>Doctors Name</div>
-                    <div className={`${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'} font-normal mt-0.5`}>Qualification</div>
-                    <div className={`${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'} font-normal`}>Reg. No :</div>
+                    <div className={`${headerTitleSize} font-bold leading-tight uppercase`}>{doctorName}</div>
+                    <div className={`${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'} font-normal mt-0.5`}>{doctorQualification}</div>
+                    <div className={`${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'} font-normal`}>Reg. No : {doctorRegNo}</div>
                 </div>
                 <div className="flex-1 text-right">
-                    <div className={`${headerTitleSize} font-bold leading-tight uppercase`}>{patient.hospitalName}</div>
-                    <div className={`${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'} font-normal mt-0.5`}>{patient.hospitalAddress}</div>
+                    <div className={`${headerTitleSize} font-bold leading-tight uppercase`}>{hospitalName}</div>
+                    <div className={`${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'} font-normal mt-0.5`}>{hospitalAddress}</div>
                     <div className={`flex justify-end ${isPreview ? 'gap-4' : 'gap-10'} mt-1 ${isPreview ? 'text-[8.5px]' : 'text-[11.5px]'}`}>
-                        <div><span className="font-bold">Ph:</span> {patient.hospitalPhone}</div>
+                        <div><span className="font-bold">Ph:</span> {hospitalPhone}</div>
                         <div><span className="font-bold">Time:</span> {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
                     </div>
                 </div>
@@ -172,7 +191,7 @@ const PrescriptionTemplate: React.FC<{ patient: PatientDemographics; prescriptio
 
 
 export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSession, doctorProfile, language: defaultLanguage }) => {
-    const { refreshUser } = useAuth();
+    const { refreshUser, user } = useAuth();
     const [phase, setPhase] = useState<'consent' | 'active' | 'processing' | 'review'>('active');
     const [sessionLanguage, setSessionLanguage] = useState(defaultLanguage || "Automatic Language Detection");
     const [transcriptHistory, setTranscriptHistory] = useState<TranscriptEntry[]>([]);
@@ -536,7 +555,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                             {phase === 'active' ? 'REC' : 'STANDBY'}
                         </div>
                         <span className="text-sm font-medium text-[#1A1D23] tabular-nums">{formatTime(duration)}</span>
-                        {phase === 'active' && <VoiceVisualizer isActive={true} />}
+                        {/* waveform removed in header */}
                     </div>
                     <div className="flex items-center gap-2">
                         <button
@@ -838,9 +857,9 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
                 {/* Processing Overlay */}
                 {phase === 'processing' && (
-                    <div className="absolute inset-0 bg-[#111]/90 md:bg-slate-50/90 backdrop-blur-md flex flex-col items-center justify-center z-50">
+                    <div className="absolute inset-0 bg-white md:bg-slate-50/90 backdrop-blur-md flex flex-col items-center justify-center z-50">
                         <div className="w-16 h-16 border-t-2 border-[#7C5CFC] md:border-blue-600 rounded-full animate-spin mb-4"></div>
-                        <h2 className="text-xl md:text-2xl font-bold text-white md:text-slate-800 tracking-widest uppercase">Processing Session</h2>
+                        <h2 className="text-xl md:text-2xl font-bold text-[#1A1D23] md:text-slate-800 tracking-widest uppercase">Synthesising</h2>
                         <div className="md:hidden absolute top-4 right-4 bg-white rounded-lg shadow-lg border border-slate-200 px-3 py-2 flex items-center gap-2 animate-fadeIn">
                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
                             <span className="text-[11px] text-slate-700 font-medium">Welcome back!</span>
@@ -876,10 +895,35 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                 </div>
                             </div>
                             <div className="p-4 md:p-6">
-                                <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview />
+                                <PrescriptionTemplate
+                                    patient={patient}
+                                    prescriptionData={prescriptionData}
+                                    doctorProfile={doctorProfile}
+                                    doctorMeta={{
+                                        name: user?.name,
+                                        qualification: user?.qualification,
+                                        registrationNumber: user?.registration_number,
+                                        hospitalName: user?.hospital_name,
+                                        hospitalAddress: user?.hospital_address,
+                                        hospitalPhone: user?.hospital_phone
+                                    }}
+                                    isPreview
+                                />
                             </div>
                             <div className="printable-area">
-                                <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} />
+                                <PrescriptionTemplate
+                                    patient={patient}
+                                    prescriptionData={prescriptionData}
+                                    doctorProfile={doctorProfile}
+                                    doctorMeta={{
+                                        name: user?.name,
+                                        qualification: user?.qualification,
+                                        registrationNumber: user?.registration_number,
+                                        hospitalName: user?.hospital_name,
+                                        hospitalAddress: user?.hospital_address,
+                                        hospitalPhone: user?.hospital_phone
+                                    }}
+                                />
                             </div>
                         </div>
                     </div>
