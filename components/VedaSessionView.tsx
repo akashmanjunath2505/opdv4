@@ -878,6 +878,9 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                             <div className="p-4 md:p-6">
                                 <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} isPreview />
                             </div>
+                            <div className="printable-area">
+                                <PrescriptionTemplate patient={patient} prescriptionData={prescriptionData} />
+                            </div>
                         </div>
                     </div>
                 )}
