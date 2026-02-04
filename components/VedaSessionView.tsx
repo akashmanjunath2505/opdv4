@@ -119,16 +119,18 @@ const PrescriptionTemplate: React.FC<{
             </div>
 
             {/* Side-by-Side: Chief Complaints & Clinical Findings */}
-            <div className="grid grid-cols-1 md:grid-cols-2 border-l border-r border-t border-gray-300 bg-[#F0F7FF]">
-                <div className={`${baseFontSize} p-2 font-bold border-b md:border-b-0 border-r md:border-r border-gray-300 uppercase tracking-tighter`}>Chief Complaint</div>
-                <div className={`${baseFontSize} p-2 font-bold uppercase tracking-tighter`}>Clinical Findings</div>
-            </div>
-            <div className={`grid grid-cols-1 md:grid-cols-2 border border-gray-300 mb-5`}>
-                <div className={`${baseFontSize} p-4 border-b md:border-b-0 border-r md:border-r border-gray-300 whitespace-pre-wrap leading-relaxed min-h-[140px] font-normal`}>
-                    {prescriptionData.subjective}
+            <div className="grid grid-cols-1 md:grid-cols-2 border border-gray-300 mb-5">
+                <div className="border-b md:border-b-0 md:border-r border-gray-300">
+                    <div className={`${baseFontSize} p-2 font-bold bg-[#F0F7FF] uppercase tracking-tighter`}>Chief Complaint</div>
+                    <div className={`${baseFontSize} p-4 whitespace-pre-wrap leading-relaxed min-h-[140px] font-normal`}>
+                        {prescriptionData.subjective}
+                    </div>
                 </div>
-                <div className={`${baseFontSize} p-4 whitespace-pre-wrap leading-relaxed min-h-[140px] font-normal`}>
-                    {prescriptionData.objective}
+                <div>
+                    <div className={`${baseFontSize} p-2 font-bold bg-[#F0F7FF] uppercase tracking-tighter`}>Clinical Findings</div>
+                    <div className={`${baseFontSize} p-4 whitespace-pre-wrap leading-relaxed min-h-[140px] font-normal`}>
+                        {prescriptionData.objective}
+                    </div>
                 </div>
             </div>
 
