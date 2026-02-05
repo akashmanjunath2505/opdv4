@@ -10,6 +10,7 @@ interface AuthContextType {
     register: (data: RegisterData) => Promise<void>;
     logout: () => void;
     refreshUser: () => Promise<void>;
+    loginAsGuest: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +30,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const initSession = async () => {
             try {
+                // Check for Guest Session first
+                const guestSessionStr = localStorage.getItem('guest_session');
+                if (guestSessionStr) {
+                    try {
+                        const guestUser = JSON.parse(guestSessionStr);
+                        if (mounted) {
+                            setUser(guestUser);
+                            setLoading(false);
+                            return; // Exit early if guest
+                        }
+                    } catch (e) {
+                        localStorage.removeItem('guest_session');
+                    }
+                }
+
                 // Get Session from LocalStorage
                 const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -57,6 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('Auth State Change:', event);
 
             if (event === 'SIGNED_IN' && session) {
+                // Clear any guest session if real login happens
+                localStorage.removeItem('guest_session');
+
                 // Retry logic for profile fetching to handle race conditions or network blips
                 let attempts = 0;
                 const maxAttempts = 3;
@@ -68,9 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             setUser(currentUser);
                             setLoading(false);
                             clearTimeout(safetyTimeout);
-                            // Only toast if this was a fresh login (not just a refresh)
-                            // We can't easily detect "fresh" vs "refresh" here without more state, 
-                            // but we can check if user was previously null.
                             if (!user) toast.success('Welcome back!');
                         }
                     } catch (err: any) {
@@ -110,11 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             // We just trigger the login. The state change is handled by onAuthStateChange
             await authService.login({ email, password });
-
-            // We don't need to manually setUser here as the event listener will do it.
-            // But we should dismiss the toast when we are sure.
-            // Actually, waiting for the user state to update might be better.
-
             toast.dismiss(toastId);
         } catch (err: any) {
             console.error('Login failed:', err);
@@ -136,14 +147,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const loginAsGuest = async (name: string) => {
+        const toastId = toast.loading('Entering as Guest...');
+        try {
+            // Create a transient guest user object
+            const guestUser: User = {
+                id: `guest-${Date.now()}`,
+                name: name,
+                email: 'guest@local',
+                qualification: 'Guest',
+                can_prescribe_allopathic: 'no',
+                subscription_tier: 'free',
+                subscription_status: 'active',
+                cases_today: 0,
+                total_cases: 0,
+                created_at: new Date().toISOString(),
+                // Add any other required fields for User type
+            };
+
+            // Save to local storage for persistence
+            localStorage.setItem('guest_session', JSON.stringify(guestUser));
+
+            // Set state
+            setUser(guestUser);
+
+            toast.success(`Welcome, ${name}!`, { id: toastId });
+        } catch (err: any) {
+            console.error('Guest login failed:', err);
+            toast.error('Could not start guest session', { id: toastId });
+        }
+    };
+
     const logout = () => {
         authService.logout();
+        localStorage.removeItem('guest_session');
         setUser(null);
         toast.success('Logged out successfully');
     };
 
     const refreshUser = async () => {
         try {
+            // If guest, just refresh from local storage? Or do nothing?
+            const guestSessionStr = localStorage.getItem('guest_session');
+            if (guestSessionStr) {
+                const guestUser = JSON.parse(guestSessionStr);
+                setUser(guestUser);
+                return;
+            }
+
             const currentUser = await authService.getCurrentUser();
             setUser(currentUser);
         } catch (err) {
@@ -152,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+        <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, loginAsGuest }}>
             {children}
         </AuthContext.Provider>
     );
