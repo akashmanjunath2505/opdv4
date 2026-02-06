@@ -18,7 +18,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultTa
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const { login, signup } = useAuth();
+    const { login, register } = useAuth();
 
     if (!isOpen) return null;
 
@@ -32,7 +32,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultTa
                 await login(email, password);
                 // Already in the product, just close modal
             } else {
-                await signup({ email, password, firstName, lastName, phone });
+                await register({
+                    email,
+                    password,
+                    name: `${firstName} ${lastName}`.trim(),
+                    qualification: 'MBBS',
+                    can_prescribe_allopathic: 'yes',
+                    phone
+                });
                 // Already in the product, just close modal
             }
             onClose();

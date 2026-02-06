@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginPage } from './LoginPage';
 import { RegisterPage } from './RegisterPage';
+import { CompleteProfilePage } from './CompleteProfilePage';
 import { Dashboard } from './Dashboard';
 import { ScribeSessionView } from './VedaSessionView';
 import { UsageLimitModal } from './UsageLimitModal';
@@ -9,7 +10,7 @@ import { PricingPage } from './PricingPage';
 import { DoctorProfile } from '../types';
 
 export const AppRouter: React.FC = () => {
-    const { user, loading, refreshUser } = useAuth();
+    const { user, loading, refreshUser, profileIncomplete } = useAuth();
     const [showRegister, setShowRegister] = useState(false);
     const [inSession, setInSession] = useState(false);
     const [showUsageLimitModal, setShowUsageLimitModal] = useState(false);
@@ -35,6 +36,10 @@ export const AppRouter: React.FC = () => {
             return <RegisterPage onSwitchToLogin={() => setShowRegister(false)} />;
         }
         return <LoginPage onSwitchToRegister={() => setShowRegister(true)} />;
+    }
+
+    if (profileIncomplete) {
+        return <CompleteProfilePage />;
     }
 
     const handleStartSession = async (language: string) => {

@@ -125,10 +125,15 @@ class AuthService {
             // AUTO-HEAL: If profile is missing but Auth exists, try to create basic profile
             console.warn('User profile missing, attempting to create default profile...');
 
+            const fallbackName =
+                (authUser.user_metadata && (authUser.user_metadata.full_name || authUser.user_metadata.name)) ||
+                authUser.email?.split('@')[0] ||
+                'Doctor (Pending Setup)';
+
             const defaultProfile = {
                 id: authUser.id,
                 email: authUser.email || '',
-                name: 'Doctor (Pending Setup)',
+                name: fallbackName,
                 qualification: 'MBBS',
                 can_prescribe_allopathic: 'yes',
                 password_hash: 'managed_by_supabase', // Required by schema
@@ -143,6 +148,8 @@ class AuthService {
                 throw new Error('User profile not found and could not be created.');
             }
 
+            localStorage.setItem('profile_incomplete', 'true');
+
             // Return the newly created profile (approximated since we just inserted)
             return {
                 ...defaultProfile,
@@ -153,6 +160,35 @@ class AuthService {
         }
 
         return profile as User;
+    }
+
+    async updateProfile(data: Partial<User>): Promise<User> {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
+            throw new Error('Not authenticated');
+        }
+
+        const { data: updated, error } = await supabase
+            .from('users')
+            .update({
+                name: data.name,
+                qualification: data.qualification,
+                can_prescribe_allopathic: data.can_prescribe_allopathic,
+                phone: data.phone,
+                registration_number: data.registration_number,
+                hospital_name: data.hospital_name,
+                hospital_address: data.hospital_address,
+                hospital_phone: data.hospital_phone
+            })
+            .eq('id', authUser.id)
+            .select()
+            .single();
+
+        if (error) {
+            throw error;
+        }
+
+        return updated as User;
     }
 
     async logout() {
@@ -174,10 +210,19 @@ class AuthService {
     }
 
     async loginWithGoogle() {
+        const envSiteUrl =
+            import.meta.env.VITE_SITE_URL ||
+            import.meta.env.VITE_PUBLIC_SITE_URL ||
+            '';
+        const origin = window.location.origin;
+        const shouldAvoidLocalhost =
+            origin && !origin.includes('localhost') && envSiteUrl.includes('localhost');
+        const redirectTo = shouldAvoidLocalhost || !envSiteUrl ? origin : envSiteUrl;
+
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: window.location.origin
+                redirectTo
             }
         });
 

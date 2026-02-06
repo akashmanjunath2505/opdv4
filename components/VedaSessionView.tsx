@@ -192,7 +192,7 @@ const PrescriptionTemplate: React.FC<{
 
 
 export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSession, doctorProfile, language: defaultLanguage }) => {
-    const { refreshUser, user } = useAuth();
+    const { refreshUser, user, incrementCaseCount } = useAuth();
     const [phase, setPhase] = useState<'consent' | 'active' | 'processing' | 'review'>('active');
     const [sessionLanguage, setSessionLanguage] = useState(defaultLanguage || "Automatic Language Detection");
     const [transcriptHistory, setTranscriptHistory] = useState<TranscriptEntry[]>([]);

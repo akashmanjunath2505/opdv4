@@ -10,7 +10,9 @@ interface AuthContextType {
     register: (data: RegisterData) => Promise<void>;
     logout: () => void;
     refreshUser: () => Promise<void>;
-    loginAsGuest: (name: string) => Promise<void>;
+    updateProfile: (data: Partial<User>) => Promise<User | null>;
+    incrementCaseCount: () => Promise<void>;
+    profileIncomplete: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,6 +20,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const [profileIncomplete, setProfileIncomplete] = useState(false);
+    const profileFlagKey = 'profile_incomplete';
 
     // Initial Load
     useEffect(() => {
@@ -30,21 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const initSession = async () => {
             try {
-                // Check for Guest Session first
-                const guestSessionStr = localStorage.getItem('guest_session');
-                if (guestSessionStr) {
-                    try {
-                        const guestUser = JSON.parse(guestSessionStr);
-                        if (mounted) {
-                            setUser(guestUser);
-                            setLoading(false);
-                            return; // Exit early if guest
-                        }
-                    } catch (e) {
-                        localStorage.removeItem('guest_session');
-                    }
-                }
-
                 // Get Session from LocalStorage
                 const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -55,7 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (session) {
                     // Fetch Profile
                     const currentUser = await authService.getCurrentUser();
-                    if (mounted) setUser(currentUser);
+                    if (mounted) {
+                        setUser(currentUser);
+                        setProfileIncomplete(localStorage.getItem(profileFlagKey) === 'true');
+                    }
                 }
             } catch (err: any) {
                 console.error('Session init error:', err);
@@ -73,9 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('Auth State Change:', event);
 
             if (event === 'SIGNED_IN' && session) {
-                // Clear any guest session if real login happens
-                localStorage.removeItem('guest_session');
-
                 // Retry logic for profile fetching to handle race conditions or network blips
                 let attempts = 0;
                 const maxAttempts = 3;
@@ -87,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             setUser(currentUser);
                             setLoading(false);
                             clearTimeout(safetyTimeout);
+                            setProfileIncomplete(localStorage.getItem(profileFlagKey) === 'true');
                             if (!user) toast.success('Welcome back!');
                         }
                     } catch (err: any) {
@@ -139,6 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const result = await authService.register(data);
             setUser(result.user);
+            localStorage.removeItem(profileFlagKey);
+            setProfileIncomplete(false);
             toast.success('Account created successfully!', { id: toastId });
         } catch (err: any) {
             console.error('Registration failed:', err);
@@ -147,63 +139,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const loginAsGuest = async (name: string) => {
-        const toastId = toast.loading('Entering as Guest...');
-        try {
-            // Create a transient guest user object
-            const guestUser: User = {
-                id: `guest-${Date.now()}`,
-                name: name,
-                email: 'guest@local',
-                qualification: 'Guest',
-                can_prescribe_allopathic: 'no',
-                subscription_tier: 'free',
-                subscription_status: 'active',
-                cases_today: 0,
-                total_cases: 0,
-                created_at: new Date().toISOString(),
-                // Add any other required fields for User type
-            };
-
-            // Save to local storage for persistence
-            localStorage.setItem('guest_session', JSON.stringify(guestUser));
-
-            // Set state
-            setUser(guestUser);
-
-            toast.success(`Welcome, ${name}!`, { id: toastId });
-        } catch (err: any) {
-            console.error('Guest login failed:', err);
-            toast.error('Could not start guest session', { id: toastId });
-        }
-    };
-
     const logout = () => {
         authService.logout();
-        localStorage.removeItem('guest_session');
+        localStorage.removeItem(profileFlagKey);
         setUser(null);
+        setProfileIncomplete(false);
         toast.success('Logged out successfully');
     };
 
     const refreshUser = async () => {
         try {
-            // If guest, just refresh from local storage? Or do nothing?
-            const guestSessionStr = localStorage.getItem('guest_session');
-            if (guestSessionStr) {
-                const guestUser = JSON.parse(guestSessionStr);
-                setUser(guestUser);
-                return;
-            }
-
             const currentUser = await authService.getCurrentUser();
             setUser(currentUser);
+            setProfileIncomplete(localStorage.getItem(profileFlagKey) === 'true');
         } catch (err) {
             console.error('Failed to refresh user:', err);
         }
     };
 
+    const updateProfile = async (data: Partial<User>) => {
+        try {
+            const updatedUser = await authService.updateProfile(data);
+            setUser(updatedUser);
+            localStorage.removeItem(profileFlagKey);
+            setProfileIncomplete(false);
+            toast.success('Profile updated');
+            return updatedUser;
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to update profile');
+            return null;
+        }
+    };
+
+    const incrementCaseCount = async () => {
+        try {
+            await authService.incrementCaseCount();
+        } catch (err) {
+            console.error('Failed to increment cases:', err);
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, loginAsGuest }}>
+        <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, updateProfile, incrementCaseCount, profileIncomplete }}>
             {children}
         </AuthContext.Provider>
     );
