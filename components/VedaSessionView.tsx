@@ -8,7 +8,6 @@ import { useVoiceEdit } from '../hooks/useVoiceEdit';
 import { processAudioSegment, generateClinicalNote } from '../services/geminiService';
 import { renderMarkdownToHTML } from '../utils/markdownRenderer';
 import { apiService } from '../services/apiService';
-import { authService } from '../services/authService';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -879,7 +878,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                     <button
                                         onClick={async () => {
                                             try {
-                                                await authService.incrementCaseCount();
+                                                await incrementCaseCount();
                                                 await refreshUser(); // Update local stats instantly
                                                 window.print();
                                             } catch (error: any) {
