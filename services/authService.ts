@@ -143,14 +143,20 @@ class AuthService {
 
             const { error: insertError } = await supabase.from('users').insert(defaultProfile);
 
-            if (insertError) {
-                console.error('Failed to auto-create profile:', insertError);
-                throw new Error('User profile not found and could not be created.');
+            if (!insertError) {
+                localStorage.setItem('profile_incomplete', 'true');
+                // Return the newly created profile (approximated since we just inserted)
+                return {
+                    ...defaultProfile,
+                    cases_today: 0,
+                    total_cases: 0,
+                    created_at: new Date().toISOString()
+                } as User;
             }
 
+            // If insert fails due to conflict or RLS, fall back to a local profile
+            console.warn('Failed to auto-create profile, using fallback:', insertError);
             localStorage.setItem('profile_incomplete', 'true');
-
-            // Return the newly created profile (approximated since we just inserted)
             return {
                 ...defaultProfile,
                 cases_today: 0,
