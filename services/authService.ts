@@ -114,12 +114,24 @@ class AuthService {
             throw new Error('Not authenticated');
         }
 
-        // 2. Get Public Profile
+        // 2. Get Public Profile (by id)
         const { data: profile, error } = await supabase
             .from('users')
             .select('*')
             .eq('id', authUser.id)
             .single();
+
+        // Fallback: if id lookup fails, try by email
+        if ((error || !profile) && authUser.email) {
+            const { data: byEmail } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', authUser.email)
+                .single();
+            if (byEmail) {
+                return byEmail as User;
+            }
+        }
 
         if (error || !profile) {
             // AUTO-HEAL: If profile is missing but Auth exists, try to create basic profile
@@ -156,6 +168,16 @@ class AuthService {
 
             // If insert fails due to conflict or RLS, fall back to a local profile
             console.warn('Failed to auto-create profile, using fallback:', insertError);
+            if (authUser.email) {
+                const { data: existingByEmail } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('email', authUser.email)
+                    .single();
+                if (existingByEmail) {
+                    return existingByEmail as User;
+                }
+            }
             localStorage.setItem('profile_incomplete', 'true');
             return {
                 ...defaultProfile,
@@ -191,6 +213,26 @@ class AuthService {
             .single();
 
         if (error) {
+            if (authUser.email) {
+                const { data: updatedByEmail } = await supabase
+                    .from('users')
+                    .update({
+                        name: data.name,
+                        qualification: data.qualification,
+                        can_prescribe_allopathic: data.can_prescribe_allopathic,
+                        phone: data.phone,
+                        registration_number: data.registration_number,
+                        hospital_name: data.hospital_name,
+                        hospital_address: data.hospital_address,
+                        hospital_phone: data.hospital_phone
+                    })
+                    .eq('email', authUser.email)
+                    .select()
+                    .single();
+                if (updatedByEmail) {
+                    return updatedByEmail as User;
+                }
+            }
             throw error;
         }
 
