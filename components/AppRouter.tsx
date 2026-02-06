@@ -38,7 +38,8 @@ export const AppRouter: React.FC = () => {
         return <LoginPage onSwitchToRegister={() => setShowRegister(true)} />;
     }
 
-    if (profileIncomplete) {
+    const isGuestUser = user.email === 'guest@local' || user.id.startsWith('guest-');
+    if (profileIncomplete && !isGuestUser) {
         return <CompleteProfilePage />;
     }
 

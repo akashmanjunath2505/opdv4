@@ -13,6 +13,7 @@ interface AuthContextType {
     updateProfile: (data: Partial<User>) => Promise<User | null>;
     incrementCaseCount: () => Promise<void>;
     profileIncomplete: boolean;
+    loginAsGuest: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [profileIncomplete, setProfileIncomplete] = useState(false);
     const profileFlagKey = 'profile_incomplete';
+    const guestSessionKey = 'guest_session';
 
     // Initial Load
     useEffect(() => {
@@ -34,6 +36,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const initSession = async () => {
             try {
+                const guestSessionStr = localStorage.getItem(guestSessionKey);
+                if (guestSessionStr) {
+                    try {
+                        const guestUser = JSON.parse(guestSessionStr) as User;
+                        if (mounted) {
+                            setUser(guestUser);
+                            setProfileIncomplete(false);
+                            setLoading(false);
+                            return;
+                        }
+                    } catch (err) {
+                        localStorage.removeItem(guestSessionKey);
+                    }
+                }
+
                 // Get Session from LocalStorage
                 const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -65,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('Auth State Change:', event);
 
             if (event === 'SIGNED_IN' && session) {
+                localStorage.removeItem(guestSessionKey);
                 // Retry logic for profile fetching to handle race conditions or network blips
                 let attempts = 0;
                 const maxAttempts = 3;
@@ -141,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const logout = () => {
         authService.logout();
+        localStorage.removeItem(guestSessionKey);
         localStorage.removeItem(profileFlagKey);
         setUser(null);
         setProfileIncomplete(false);
@@ -149,6 +168,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const refreshUser = async () => {
         try {
+            const guestSessionStr = localStorage.getItem(guestSessionKey);
+            if (guestSessionStr) {
+                const guestUser = JSON.parse(guestSessionStr) as User;
+                setUser(guestUser);
+                setProfileIncomplete(false);
+                return;
+            }
             const currentUser = await authService.getCurrentUser();
             setUser(currentUser);
             setProfileIncomplete(localStorage.getItem(profileFlagKey) === 'true');
@@ -173,14 +199,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const incrementCaseCount = async () => {
         try {
+            const guestSessionStr = localStorage.getItem(guestSessionKey);
+            if (guestSessionStr) {
+                const guestUser = JSON.parse(guestSessionStr) as User;
+                const updated = {
+                    ...guestUser,
+                    cases_today: (guestUser.cases_today || 0) + 1,
+                    total_cases: (guestUser.total_cases || 0) + 1
+                };
+                localStorage.setItem(guestSessionKey, JSON.stringify(updated));
+                setUser(updated);
+                return;
+            }
             await authService.incrementCaseCount();
         } catch (err) {
             console.error('Failed to increment cases:', err);
         }
     };
 
+    const loginAsGuest = async (name: string) => {
+        const toastId = toast.loading('Entering as Guest...');
+        try {
+            const guestUser: User = {
+                id: `guest-${Date.now()}`,
+                name,
+                email: 'guest@local',
+                qualification: 'MBBS',
+                can_prescribe_allopathic: 'yes',
+                phone: '',
+                registration_number: 'N/A',
+                profile_picture_url: '',
+                hospital_name: 'Guest Clinic',
+                hospital_address: '',
+                hospital_phone: '',
+                subscription_tier: 'free',
+                subscription_status: 'active',
+                cases_today: 0,
+                total_cases: 0,
+                created_at: new Date().toISOString()
+            };
+            localStorage.setItem(guestSessionKey, JSON.stringify(guestUser));
+            setUser(guestUser);
+            setProfileIncomplete(false);
+            toast.success(`Welcome, ${name}!`, { id: toastId });
+        } catch (err: any) {
+            console.error('Guest login failed:', err);
+            toast.error('Could not start guest session', { id: toastId });
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, updateProfile, incrementCaseCount, profileIncomplete }}>
+        <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, updateProfile, incrementCaseCount, profileIncomplete, loginAsGuest }}>
             {children}
         </AuthContext.Provider>
     );

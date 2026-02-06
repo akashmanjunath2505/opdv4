@@ -215,14 +215,13 @@ class AuthService {
             import.meta.env.VITE_PUBLIC_SITE_URL ||
             '';
         const origin = window.location.origin;
-        const shouldAvoidLocalhost =
-            origin && !origin.includes('localhost') && envSiteUrl.includes('localhost');
-        const redirectTo = shouldAvoidLocalhost || !envSiteUrl ? origin : envSiteUrl;
+        const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
+        const redirectTo = envSiteUrl ? envSiteUrl : origin;
 
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo
+                redirectTo: isLocal ? origin : redirectTo
             }
         });
 
