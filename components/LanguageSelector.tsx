@@ -3,13 +3,16 @@ import { LANGUAGES, LanguageOption } from '../utils/languages';
 import { Icon } from './Icon';
 
 interface LanguageSelectorProps {
-    value: string;
-    onChange: (languageName: string) => void;
+    value: string[];
+    onChange: (languageNames: string[]) => void;
 }
+
+const AUTO_DETECT_LABEL = 'Automatic Language Detection';
 
 export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ value, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [pendingSelection, setPendingSelection] = useState<string[]>(value);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Close dropdown when clicking outside
@@ -23,23 +26,53 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ value, onCha
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        setPendingSelection(value);
+    }, [value]);
+
     const filteredLanguages = LANGUAGES.filter(lang =>
         lang.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lang.nativeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lang.code.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const selectedOption = LANGUAGES.find(lang => lang.name === value) || LANGUAGES[0];
+    const selectedOption = LANGUAGES.find(lang => lang.name === value[0]) || LANGUAGES[0];
+    const selectedLabel = value.length > 1
+        ? `${selectedOption.name} +${value.length - 1}`
+        : selectedOption.name;
+
+    const toggleLanguage = (languageName: string) => {
+        setPendingSelection((prev) => {
+            if (languageName === AUTO_DETECT_LABEL) {
+                return prev.includes(AUTO_DETECT_LABEL) ? [] : [AUTO_DETECT_LABEL];
+            }
+            const withoutAuto = prev.filter(item => item !== AUTO_DETECT_LABEL);
+            if (withoutAuto.includes(languageName)) {
+                return withoutAuto.filter(item => item !== languageName);
+            }
+            return [...withoutAuto, languageName];
+        });
+    };
+
+    const handleDone = () => {
+        const nextValue = pendingSelection.length > 0 ? pendingSelection : [AUTO_DETECT_LABEL];
+        onChange(nextValue);
+        setIsOpen(false);
+        setSearchQuery('');
+    };
 
     return (
         <div className="relative" ref={dropdownRef}>
             <div
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    setIsOpen(!isOpen);
+                    setPendingSelection(value);
+                }}
                 className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white flex items-center justify-between cursor-pointer hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-600 focus-within:border-transparent transition-all"
             >
                 <div className="flex items-center gap-3">
                     <span className="text-xl">{selectedOption.flag}</span>
-                    <span className="text-slate-900 font-medium">{selectedOption.name}</span>
+                    <span className="text-slate-900 font-medium">{selectedLabel}</span>
                 </div>
                 <Icon name="chevronDown" className={`w-5 h-5 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </div>
@@ -65,19 +98,22 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ value, onCha
                             filteredLanguages.map(lang => (
                                 <div
                                     key={lang.code}
-                                    onClick={() => {
-                                        onChange(lang.name);
-                                        setIsOpen(false);
-                                        setSearchQuery('');
-                                    }}
-                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${value === lang.name
+                                    onClick={() => toggleLanguage(lang.name)}
+                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${pendingSelection.includes(lang.name)
                                         ? 'bg-blue-50 text-blue-700'
                                         : 'hover:bg-slate-50 text-slate-700'
                                         }`}
                                 >
+                                    <input
+                                        type="checkbox"
+                                        checked={pendingSelection.includes(lang.name)}
+                                        onClick={(event) => event.stopPropagation()}
+                                        onChange={() => toggleLanguage(lang.name)}
+                                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                    />
                                     <span className="text-lg w-6 text-center">{lang.flag}</span>
                                     <div className="flex flex-col">
-                                        <span className={`text-sm ${value === lang.name ? 'font-semibold' : 'font-medium'}`}>
+                                        <span className={`text-sm ${pendingSelection.includes(lang.name) ? 'font-semibold' : 'font-medium'}`}>
                                             {lang.name}
                                         </span>
                                         {lang.name !== lang.nativeName && (
@@ -86,9 +122,6 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ value, onCha
                                             </span>
                                         )}
                                     </div>
-                                    {value === lang.name && (
-                                        <Icon name="check" className="w-4 h-4 ml-auto text-blue-600" />
-                                    )}
                                 </div>
                             ))
                         ) : (
@@ -96,6 +129,18 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ value, onCha
                                 No languages found
                             </div>
                         )}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-2 bg-white rounded-b-lg">
+                        <span className="text-xs text-slate-500">
+                            {pendingSelection.length} selected
+                        </span>
+                        <button
+                            type="button"
+                            onClick={handleDone}
+                            className="px-3 py-1.5 text-xs font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                        >
+                            Done
+                        </button>
                     </div>
                 </div>
             )}

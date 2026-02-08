@@ -135,6 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div
                 className={`fixed top-0 left-0 w-72 h-full bg-black z-30 transform transition-transform duration-300 ease-in-out border-r border-gray-800 no-print ${isOpen ? 'translate-x-0' : '-translate-x-full'
                     } md:relative md:translate-x-0 md:flex-shrink-0 flex flex-col`}
+                data-tour-id="dashboard-sidebar"
             >
                 {/* Header */}
                 <div className="p-4 flex-shrink-0 flex justify-between items-center mb-2">

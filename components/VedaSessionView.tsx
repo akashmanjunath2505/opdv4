@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { DoctorProfile, TranscriptEntry, PrescriptionData, PatientDemographics } from '../types';
 import { Icon } from './Icon';
+import { GuidedWalkthroughOverlay, WalkthroughStep } from './GuidedWalkthroughOverlay';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useLiveScribe } from '../hooks/useLiveScribe';
@@ -15,6 +16,9 @@ interface ScribeSessionViewProps {
     onEndSession: () => void;
     doctorProfile: DoctorProfile;
     language: string;
+    tourMode?: boolean;
+    onTourComplete?: () => void;
+    walkthroughLanguage?: string;
 }
 
 // Visualizer Component
@@ -191,14 +195,245 @@ const PrescriptionTemplate: React.FC<{
 };
 
 
-export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSession, doctorProfile, language: defaultLanguage }) => {
+export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({
+    onEndSession,
+    doctorProfile,
+    language: defaultLanguage,
+    tourMode = false,
+    onTourComplete,
+    walkthroughLanguage = 'English (UK)'
+}) => {
     const { refreshUser, user, incrementCaseCount } = useAuth();
     const [phase, setPhase] = useState<'consent' | 'active' | 'processing' | 'review'>('active');
     const [sessionLanguage, setSessionLanguage] = useState(defaultLanguage || "Automatic Language Detection");
     const [transcriptHistory, setTranscriptHistory] = useState<TranscriptEntry[]>([]);
     const [clinicalNote, setClinicalNote] = useState('');
     const [duration, setDuration] = useState(0);
+    const [tourStep, setTourStep] = useState(0);
+    const [reviewTourActive, setReviewTourActive] = useState(false);
+    const [reviewTourStep, setReviewTourStep] = useState(0);
     const [showPdfPreview, setShowPdfPreview] = useState(false);
+
+    const translations = {
+        'English (UK)': {
+            sidebarProfile: { title: 'Doctor Profile', message: 'See the clinician details for this session.' },
+            sidebarProgress: { title: 'Session Progress', message: 'Track how complete the session notes are.' },
+            sidebarChecklist: { title: 'Checklist', message: 'Key sections of the consultation appear here.' },
+            sidebarStatus: { title: 'Connection Status', message: 'Shows if your app is connected and online.' },
+            waveform: { title: 'Listening', message: 'This shows live listening while recording.' },
+            timer: { title: 'Session Timer', message: 'This tracks your session time.' },
+            transcript: { title: 'Transcript', message: 'Listening status appears here now; the transcript shows after you stop.' },
+            stop: { title: 'Stop Session', message: 'Stop to finish and generate notes.' },
+            pdfButton: { title: 'PDF Preview', message: 'Open the PDF preview for this session.' },
+            pdfPreview: { title: 'Preview', message: 'Review the full PDF content here.' },
+            saveExport: { title: 'Save / Export', message: 'Download the PDF for sharing or printing.' },
+            newPatient: { title: 'New Patient', message: 'Start a fresh session for the next patient.' },
+            voiceEdit: { title: 'Voice Edit', message: 'Use voice commands to refine notes and medicines.' },
+            chat: { title: 'Show Chat', message: 'Open Chat for follow-ups after transcription.' },
+        },
+        Hindi: {
+            sidebarProfile: { title: 'डॉक्टर प्रोफ़ाइल', message: 'इस सेशन के चिकित्सक विवरण यहाँ दिखते हैं।' },
+            sidebarProgress: { title: 'सेशन प्रोग्रेस', message: 'यहाँ सेशन नोट्स की प्रगति दिखती है।' },
+            sidebarChecklist: { title: 'चेकलिस्ट', message: 'कंसल्टेशन के मुख्य सेक्शन यहाँ दिखते हैं।' },
+            sidebarStatus: { title: 'कनेक्शन स्टेटस', message: 'ऐप ऑनलाइन है या नहीं यहाँ दिखता है।' },
+            waveform: { title: 'सुनना', message: 'रिकॉर्डिंग के दौरान लाइव सुनना यहाँ दिखता है।' },
+            timer: { title: 'सेशन टाइमर', message: 'यह आपके सेशन का समय दिखाता है।' },
+            transcript: { title: 'ट्रांसक्रिप्ट', message: 'अभी यहाँ सुनने की स्थिति दिखती है; स्टॉप के बाद ट्रांसक्रिप्ट दिखाई देता है।' },
+            stop: { title: 'सेशन रोकें', message: 'सेशन समाप्त करके नोट्स बनाएं।' },
+            pdfButton: { title: 'PDF प्रीव्यू', message: 'इस सेशन का PDF प्रीव्यू खोलें।' },
+            pdfPreview: { title: 'प्रीव्यू', message: 'यहाँ पूरा PDF कंटेंट देखें।' },
+            saveExport: { title: 'सेव / एक्सपोर्ट', message: 'PDF डाउनलोड करके शेयर या प्रिंट करें।' },
+            newPatient: { title: 'नया मरीज', message: 'अगले मरीज के लिए नया सेशन शुरू करें।' },
+            voiceEdit: { title: 'वॉइस एडिट', message: 'वॉइस कमांड से नोट्स और दवाइयाँ सुधारें।' },
+            chat: { title: 'चैट दिखाएँ', message: 'ट्रांसक्रिप्शन के बाद फॉलो‑अप के लिए चैट खोलें।' },
+        },
+        Marathi: {
+            sidebarProfile: { title: 'डॉक्टर प्रोफाइल', message: 'या सेशनचे डॉक्टरचे तपशील येथे दिसतात.' },
+            sidebarProgress: { title: 'सेशन प्रगती', message: 'सेशन नोट्सची प्रगती येथे दिसते.' },
+            sidebarChecklist: { title: 'चेकलिस्ट', message: 'कन्सल्टेशनचे मुख्य विभाग येथे दिसतात.' },
+            sidebarStatus: { title: 'कनेक्शन स्टेटस', message: 'ॲप ऑनलाइन आहे का ते येथे दिसते.' },
+            waveform: { title: 'ऐकणे', message: 'रेकॉर्डिंग दरम्यान लाईव्ह ऐकणे येथे दिसते.' },
+            timer: { title: 'सेशन टाइमर', message: 'हा तुमच्या सेशनचा वेळ दाखवतो.' },
+            transcript: { title: 'ट्रान्सक्रिप्ट', message: 'आत्ता येथे ऐकण्याची स्थिती दिसते; थांबल्यावर ट्रान्सक्रिप्ट दिसेल.' },
+            stop: { title: 'सेशन थांबवा', message: 'थांबवून नोट्स तयार करा.' },
+            pdfButton: { title: 'PDF प्रिव्ह्यू', message: 'या सेशनचा PDF प्रिव्ह्यू उघडा.' },
+            pdfPreview: { title: 'प्रिव्ह्यू', message: 'येथे पूर्ण PDF कंटेंट पहा.' },
+            saveExport: { title: 'सेव / एक्सपोर्ट', message: 'PDF डाउनलोड करून शेअर किंवा प्रिंट करा.' },
+            newPatient: { title: 'नवा रुग्ण', message: 'पुढील रुग्णासाठी नवे सेशन सुरू करा.' },
+            voiceEdit: { title: 'व्हॉइस एडिट', message: 'व्हॉइस कमांडने नोट्स व औषधे सुधारित करा.' },
+            chat: { title: 'चॅट दाखवा', message: 'ट्रान्सक्रिप्शननंतर फॉलो‑अपसाठी चॅट उघडा.' },
+        },
+        'Urdu (Pakistan)': {
+            sidebarProfile: { title: 'ڈاکٹر پروفائل', message: 'اس سیشن کے معالج کی تفصیلات یہاں ہیں۔' },
+            sidebarProgress: { title: 'سیشن کی پیش رفت', message: 'یہاں سیشن نوٹس کی پیش رفت نظر آتی ہے۔' },
+            sidebarChecklist: { title: 'چیک لسٹ', message: 'مشاورت کے اہم حصے یہاں دکھتے ہیں۔' },
+            sidebarStatus: { title: 'کنکشن اسٹیٹس', message: 'یہ دکھاتا ہے کہ ایپ آن لائن ہے یا نہیں۔' },
+            waveform: { title: 'سننا', message: 'ریکارڈنگ کے دوران لائیو سننا یہاں دکھائی دیتا ہے۔' },
+            timer: { title: 'سیشن ٹائمر', message: 'یہ آپ کے سیشن کا وقت دکھاتا ہے۔' },
+            transcript: { title: 'ٹرانسکرپٹ', message: 'ابھی یہاں سننے کی حالت نظر آتی ہے؛ رکنے کے بعد ٹرانسکرپٹ دکھے گا۔' },
+            stop: { title: 'سیشن روکیں', message: 'سیشن ختم کر کے نوٹس بنائیں۔' },
+            pdfButton: { title: 'PDF پریویو', message: 'اس سیشن کا PDF پریویو کھولیں۔' },
+            pdfPreview: { title: 'پریویو', message: 'یہاں مکمل PDF مواد دیکھیں۔' },
+            saveExport: { title: 'سیو / ایکسپورٹ', message: 'PDF ڈاؤن لوڈ کر کے شیئر یا پرنٹ کریں۔' },
+            newPatient: { title: 'نیا مریض', message: 'اگلے مریض کے لیے نیا سیشن شروع کریں۔' },
+            voiceEdit: { title: 'وائس ایڈٹ', message: 'وائس کمانڈ سے نوٹس اور ادویات بہتر کریں۔' },
+            chat: { title: 'چیٹ دکھائیں', message: 'ٹرانسکرپشن کے بعد فالو اپ کے لیے چیٹ کھولیں۔' },
+        },
+        'Urdu (India)': {
+            sidebarProfile: { title: 'ڈاکٹر پروفائل', message: 'اس سیشن کے معالج کی تفصیلات یہاں ہیں۔' },
+            sidebarProgress: { title: 'سیشن کی پیش رفت', message: 'یہاں سیشن نوٹس کی پیش رفت نظر آتی ہے۔' },
+            sidebarChecklist: { title: 'چیک لسٹ', message: 'مشاورت کے اہم حصے یہاں دکھتے ہیں۔' },
+            sidebarStatus: { title: 'کنکشن اسٹیٹس', message: 'یہ دکھاتا ہے کہ ایپ آن لائن ہے یا نہیں۔' },
+            waveform: { title: 'سننا', message: 'ریکارڈنگ کے دوران لائیو سننا یہاں دکھائی دیتا ہے۔' },
+            timer: { title: 'سیشن ٹائمر', message: 'یہ آپ کے سیشن کا وقت دکھاتا ہے۔' },
+            transcript: { title: 'ٹرانسکرپٹ', message: 'ابھی یہاں سننے کی حالت نظر آتی ہے؛ رکنے کے بعد ٹرانسکرپٹ دکھے گا۔' },
+            stop: { title: 'سیشن روکیں', message: 'سیشن ختم کر کے نوٹس بنائیں۔' },
+            pdfButton: { title: 'PDF پریویو', message: 'اس سیشن کا PDF پریویو کھولیں۔' },
+            pdfPreview: { title: 'پریویو', message: 'یہاں مکمل PDF مواد دیکھیں۔' },
+            saveExport: { title: 'سیو / ایکسپورٹ', message: 'PDF ڈاؤن لوڈ کر کے شیئر یا پرنٹ کریں۔' },
+            newPatient: { title: 'نیا مریض', message: 'اگلے مریض کے لیے نیا سیشن شروع کریں۔' },
+            voiceEdit: { title: 'وائس ایڈٹ', message: 'وائس کمانڈ سے نوٹس اور ادویات بہتر کریں۔' },
+            chat: { title: 'چیٹ دکھائیں', message: 'ٹرانسکرپشن کے بعد فالو اپ کے لیے چیٹ کھولیں۔' },
+        },
+        Swahili: {
+            sidebarProfile: { title: 'Wasifu wa Daktari', message: 'Maelezo ya daktari wa kikao yanaonekana hapa.' },
+            sidebarProgress: { title: 'Maendeleo ya Kikao', message: 'Hapa unaona maendeleo ya noti za kikao.' },
+            sidebarChecklist: { title: 'Orodha Hakiki', message: 'Sehemu kuu za ushauri zinaonekana hapa.' },
+            sidebarStatus: { title: 'Hali ya Muunganisho', message: 'Inaonyesha kama programu iko mtandaoni.' },
+            waveform: { title: 'Kusikiliza', message: 'Hapa inaonyesha kusikiliza moja kwa moja wakati wa kurekodi.' },
+            timer: { title: 'Kipima Muda', message: 'Hii inaonyesha muda wa kikao chako.' },
+            transcript: { title: 'Nakala', message: 'Hali ya kusikiliza inaonekana hapa; nakala huonekana baada ya kusitisha.' },
+            stop: { title: 'Simamisha Kikao', message: 'Simamisha ili kumaliza na kutengeneza dondoo.' },
+            pdfButton: { title: 'Hakiki ya PDF', message: 'Fungua hakiki ya PDF ya kikao hiki.' },
+            pdfPreview: { title: 'Hakiki', message: 'Kagua maudhui yote ya PDF hapa.' },
+            saveExport: { title: 'Hifadhi / Hamisha', message: 'Pakua PDF kwa kushiriki au kuchapisha.' },
+            newPatient: { title: 'Mgonjwa Mpya', message: 'Anza kikao kipya kwa mgonjwa mwingine.' },
+            voiceEdit: { title: 'Hariri kwa Sauti', message: 'Tumia amri za sauti kuboresha dondoo na dawa.' },
+            chat: { title: 'Onyesha Gumzo', message: 'Fungua gumzo kwa ufuatiliaji baada ya nakala.' },
+        },
+        'Arabic (Saudi Arabia)': {
+            sidebarProfile: { title: 'ملف الطبيب', message: 'تفاصيل الطبيب لهذه الجلسة تظهر هنا.' },
+            sidebarProgress: { title: 'تقدم الجلسة', message: 'هنا يظهر تقدم ملاحظات الجلسة.' },
+            sidebarChecklist: { title: 'قائمة التحقق', message: 'الأقسام الرئيسية للاستشارة تظهر هنا.' },
+            sidebarStatus: { title: 'حالة الاتصال', message: 'يعرض ما إذا كان التطبيق متصلاً بالإنترنت.' },
+            waveform: { title: 'الاستماع', message: 'يعرض هذا الاستماع المباشر أثناء التسجيل.' },
+            timer: { title: 'مؤقت الجلسة', message: 'يعرض هذا مدة الجلسة.' },
+            transcript: { title: 'النص', message: 'تظهر حالة الاستماع الآن؛ يظهر النص بعد الإيقاف.' },
+            stop: { title: 'إيقاف الجلسة', message: 'أوقف لإنهاء وإنشاء الملاحظات.' },
+            pdfButton: { title: 'معاينة PDF', message: 'افتح معاينة PDF لهذه الجلسة.' },
+            pdfPreview: { title: 'المعاينة', message: 'راجع محتوى PDF بالكامل هنا.' },
+            saveExport: { title: 'حفظ / تصدير', message: 'حمّل PDF للمشاركة أو الطباعة.' },
+            newPatient: { title: 'مريض جديد', message: 'ابدأ جلسة جديدة للمريض التالي.' },
+            voiceEdit: { title: 'تحرير بالصوت', message: 'استخدم الأوامر الصوتية لتحسين الملاحظات والأدوية.' },
+            chat: { title: 'إظهار الدردشة', message: 'افتح الدردشة للمتابعة بعد النسخ.' },
+        },
+    } as const;
+
+    const copy = translations[walkthroughLanguage as keyof typeof translations] || translations['English (UK)'];
+
+    const vedaTourSteps: WalkthroughStep[] = [
+        {
+            id: 'sidebar-profile',
+            targetId: 'veda-sidebar-profile',
+            title: copy.sidebarProfile.title,
+            message: copy.sidebarProfile.message,
+            placement: 'right',
+        },
+        {
+            id: 'sidebar-progress',
+            targetId: 'veda-sidebar-progress',
+            title: copy.sidebarProgress.title,
+            message: copy.sidebarProgress.message,
+            placement: 'right',
+        },
+        {
+            id: 'sidebar-checklist',
+            targetId: 'veda-sidebar-checklist',
+            title: copy.sidebarChecklist.title,
+            message: copy.sidebarChecklist.message,
+            placement: 'right',
+        },
+        {
+            id: 'sidebar-status',
+            targetId: 'veda-sidebar-status',
+            title: copy.sidebarStatus.title,
+            message: copy.sidebarStatus.message,
+            placement: 'right',
+        },
+        {
+            id: 'waveform',
+            targetId: 'veda-waveform',
+            title: copy.waveform.title,
+            message: copy.waveform.message,
+            placement: 'right',
+        },
+        {
+            id: 'timer',
+            targetId: 'veda-timer',
+            title: copy.timer.title,
+            message: copy.timer.message,
+            placement: 'right',
+        },
+        {
+            id: 'transcript',
+            targetId: 'veda-transcript',
+            title: copy.transcript.title,
+            message: copy.transcript.message,
+            placement: 'left',
+        },
+        {
+            id: 'stop',
+            targetId: 'veda-stop-session',
+            title: copy.stop.title,
+            message: copy.stop.message,
+            placement: 'bottom',
+        },
+    ];
+
+    const reviewTourSteps: WalkthroughStep[] = [
+        {
+            id: 'review-pdf-button',
+            targetId: 'review-pdf-button',
+            title: copy.pdfButton.title,
+            message: copy.pdfButton.message,
+            placement: 'bottom',
+        },
+        {
+            id: 'review-pdf-preview',
+            targetId: 'review-pdf-preview',
+            title: copy.pdfPreview.title,
+            message: copy.pdfPreview.message,
+            placement: 'right',
+        },
+        {
+            id: 'review-save-export',
+            targetId: 'review-save-export',
+            title: copy.saveExport.title,
+            message: copy.saveExport.message,
+            placement: 'bottom',
+        },
+        {
+            id: 'review-new-patient',
+            targetId: 'review-new-patient',
+            title: copy.newPatient.title,
+            message: copy.newPatient.message,
+            placement: 'bottom',
+        },
+        {
+            id: 'review-voice-edit',
+            targetId: 'review-voice-edit',
+            title: copy.voiceEdit.title,
+            message: copy.voiceEdit.message,
+            placement: 'bottom',
+        },
+        {
+            id: 'review-chat',
+            targetId: 'veda-show-chat',
+            title: copy.chat.title,
+            message: copy.chat.message,
+            placement: 'bottom',
+        },
+    ];
 
     // NEW: Left Panel State
     const [activeTab, setActiveTab] = useState<'transcript' | 'checklist'>('transcript');
@@ -384,12 +619,47 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
     }, [patient, startRecording, startListening, processSegment, resetTranscript]);
 
     useEffect(() => {
+        if (tourMode) return;
         if (hasStartedRef.current) return;
         hasStartedRef.current = true;
         handleStartSession();
-    }, [handleStartSession]);
+    }, [handleStartSession, tourMode]);
+
+    useEffect(() => {
+        if (!tourMode) return;
+        setPhase('active');
+        setDuration(0);
+        setTourStep(0);
+    }, [tourMode]);
+
+    useEffect(() => {
+        if (phase !== 'review') return;
+        const reviewTourKey = user?.id ? `has_seen_review_tour_${user.id}` : 'has_seen_review_tour';
+        const hasSeenReview = localStorage.getItem(reviewTourKey) === 'true';
+        if (!hasSeenReview) {
+            setReviewTourActive(true);
+            setReviewTourStep(0);
+        }
+    }, [phase]);
+
+    useEffect(() => {
+        if (!reviewTourActive) return;
+        const current = reviewTourSteps[reviewTourStep];
+        if (!current) return;
+        const isPdfStep = current.targetId === 'review-pdf-preview' || current.targetId === 'review-save-export';
+        if (isPdfStep && !showPdfPreview) {
+            setShowPdfPreview(true);
+        } else if (!isPdfStep && showPdfPreview) {
+            setShowPdfPreview(false);
+        }
+    }, [reviewTourActive, reviewTourStep, reviewTourSteps, showPdfPreview]);
 
     const handleStopSession = useCallback(async () => {
+        if (tourMode) {
+            setPhase('review');
+            setShowTranscript(true);
+            return;
+        }
         stopListening();
         setPhase('processing');
         const finalBlob = await stopRecording();
@@ -521,6 +791,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
         return true;
     };
 
+
     const checklistItems = [
         { label: "Chief Complaint & History", valid: checkField(prescriptionData.subjective), icon: "user" },
         { label: "Examination & Vitals", valid: checkField(prescriptionData.objective), icon: "shieldCheck" },
@@ -530,6 +801,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
     const completedCount = checklistItems.filter(i => i.valid).length;
     const progressPercent = Math.round((completedCount / checklistItems.length) * 100);
+    const showChatButton = phase === 'review' || reviewTourActive;
 
     return (
         <div className="flex-1 flex flex-col md:flex-row bg-[#F5F7FA] md:bg-slate-50 overflow-y-auto md:overflow-hidden min-h-screen md:h-screen font-sans pt-28 md:pt-0 pb-10 md:pb-0">
@@ -537,6 +809,56 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 @keyframes wave { 0%, 100% { height: 20%; opacity: 0.5; } 50% { height: 100%; opacity: 1; } }
                 .animate-wave { animation: wave 1s ease-in-out infinite; }
             `}</style>
+            {(tourMode || reviewTourActive) && (
+                <GuidedWalkthroughOverlay
+                    isOpen={tourMode || reviewTourActive}
+                    steps={reviewTourActive ? reviewTourSteps : vedaTourSteps}
+                    activeStep={reviewTourActive ? reviewTourStep : tourStep}
+                    nurseImageUrl="https://raw.githubusercontent.com/akashmanjunath2505/public/main/nurse.jpeg"
+                    onBack={() => {
+                        if (reviewTourActive) {
+                            setReviewTourStep((prev) => Math.max(0, prev - 1));
+                        } else {
+                            setTourStep((prev) => Math.max(0, prev - 1));
+                        }
+                    }}
+                    onNext={() => {
+                        if (reviewTourActive) {
+                            setReviewTourStep((prev) => Math.min(reviewTourSteps.length - 1, prev + 1));
+                        } else {
+                            setTourStep((prev) => Math.min(vedaTourSteps.length - 1, prev + 1));
+                        }
+                    }}
+                    onDone={() => {
+                        if (reviewTourActive) {
+                            const reviewTourKey = user?.id ? `has_seen_review_tour_${user.id}` : 'has_seen_review_tour';
+                            localStorage.setItem(reviewTourKey, 'true');
+                            const vedaTourKey = user?.id ? `has_seen_veda_tour_${user.id}` : 'has_seen_veda_tour';
+                            localStorage.setItem(vedaTourKey, 'true');
+                            setReviewTourActive(false);
+                            setReviewTourStep(0);
+                            onTourComplete?.();
+                        } else {
+                            handleStopSession();
+                        }
+                    }}
+                    onMissingTarget={() => {
+                        if (reviewTourActive) {
+                            setReviewTourStep((prev) => {
+                                const next = Math.min(reviewTourSteps.length - 1, prev + 1);
+                                if (next === prev) {
+                                    localStorage.setItem('has_seen_review_tour', 'true');
+                                    setReviewTourActive(false);
+                                    return 0;
+                                }
+                                return next;
+                            });
+                        } else {
+                            setTourStep((prev) => Math.min(vedaTourSteps.length - 1, prev + 1));
+                        }
+                    }}
+                />
+            )}
             {/* MOBILE TOP STRIP */}
             <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
                 <div className="px-4 pt-3 pb-2">
@@ -555,25 +877,34 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                             <div className={`w-1.5 h-1.5 rounded-full ${phase === 'active' ? 'bg-[#E8524A] animate-pulse' : 'bg-[#22C55E]'}`}></div>
                             {phase === 'active' ? 'REC' : 'STANDBY'}
                         </div>
-                        <span className="text-sm font-medium text-[#1A1D23] tabular-nums">{formatTime(duration)}</span>
-                        {/* waveform removed in header */}
                     </div>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowTranscript(prev => !prev)}
-                            className="min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 transition-all"
-                        >
-                            {showTranscript ? 'Hide Chat' : 'Show Chat'}
-                        </button>
+                        {showChatButton && (
+                            <button
+                                onClick={() => setShowTranscript(prev => !prev)}
+                                data-tour-id="veda-show-chat"
+                                className="min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 transition-all"
+                            >
+                                {showTranscript ? 'Hide Chat' : 'Show Chat'}
+                            </button>
+                        )}
                         {phase !== 'active' && (
                             <>
-                                <button onClick={toggleVoiceEdit} className={`min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-[#3B6FE0] text-white shadow-[0_0_12px_rgba(59,111,224,0.35)]' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-900'}`}>
+                                <button
+                                    onClick={toggleVoiceEdit}
+                                    data-tour-id="review-voice-edit"
+                                    className={`min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-[#3B6FE0] text-white shadow-[0_0_12px_rgba(59,111,224,0.35)]' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-900'}`}
+                                >
                                     <span className="flex items-center gap-2">
                                         <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-4 h-4 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
                                         Voice Edit
                                     </span>
                                 </button>
-                                <button onClick={() => setShowPdfPreview(!showPdfPreview)} className="min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 transition-all">
+                                <button
+                                    onClick={() => setShowPdfPreview(!showPdfPreview)}
+                                    data-tour-id="review-pdf-button"
+                                    className="min-h-[44px] px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 transition-all"
+                                >
                                     <span className="flex items-center gap-2">
                                         <Icon name="document-text" className="w-4 h-4" />
                                         PDF
@@ -609,14 +940,14 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                     </div>
 
                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">Session Info</h3>
-                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6">
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6" data-tour-id="veda-sidebar-profile">
                         <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">Doctor Profile</div>
                         <div className="text-sm font-bold text-slate-900">Dr. {doctorProfile?.name || "Sharma"} (MBBS)</div>
                         <div className="text-[10px] uppercase text-slate-500 font-bold mt-3 mb-1">Department</div>
                         <div className="text-sm font-bold text-slate-900">General Medicine</div>
                     </div>
 
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2" data-tour-id="veda-sidebar-progress">
                         <span className="text-xs font-bold text-slate-700">Session Progress</span>
                         <span className="text-xl font-black text-blue-600">{progressPercent}%</span>
                     </div>
@@ -624,7 +955,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-6" data-tour-id="veda-sidebar-checklist">
                         {checklistItems.map((item, idx) => (
                             <div key={idx} className="flex items-center gap-3 group">
                                 <Icon name={item.icon || "circle"} className={`w-5 h-5 ${item.valid ? 'text-blue-600' : 'text-slate-300 group-hover:text-slate-400'}`} />
@@ -636,7 +967,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 </div>
 
                 <div className="mt-auto p-4 border-t border-slate-200">
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 items-center">
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 items-center" data-tour-id="veda-sidebar-status">
                         <Icon name="wifi" className="w-4 h-4 text-green-500" />
                         <span className="text-xs font-medium text-slate-400">Status: Connected</span>
                     </div>
@@ -645,14 +976,22 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
 
             {/* MIDDLE COLUMN: TRANSCRIPT (Independent Space) */}
             {(phase === 'active' || showTranscript) && (
-                <div className={`flex ${phase === 'active' ? 'flex-1' : 'w-full md:w-[380px]'} flex-col border-b md:border-b-0 md:border-r border-slate-200 bg-white transition-all duration-500`}>
+                <div
+                    className={`flex ${phase === 'active' ? 'flex-1' : 'w-full md:w-[380px]'} flex-col border-b md:border-b-0 md:border-r border-slate-200 bg-white transition-all duration-500`}
+                    data-tour-id="veda-transcript"
+                >
                 <div className="h-14 md:h-16 flex items-center px-4 md:px-6 border-b border-slate-200">
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#3B6FE0] md:text-blue-600">Transcript</span>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                     {phase === 'active' ? (
                         <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center">
-                            <VoiceVisualizer isActive={true} size="large" />
+                            <div data-tour-id="veda-waveform">
+                                <VoiceVisualizer isActive={true} size="large" />
+                            </div>
+                            <span className="mt-4 text-base font-semibold text-slate-900 tabular-nums" data-tour-id="veda-timer">
+                                {formatTime(duration)}
+                            </span>
                             <p className="text-[11px] uppercase tracking-[0.3em] text-[#7C5CFC] md:text-blue-600 mt-6 animate-pulse font-bold">Listening...</p>
                             <p className="text-[11px] text-[#6B7280] md:text-slate-500 mt-2">Speak clearly into the microphone</p>
                             <button
@@ -695,23 +1034,24 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
             <div className={`flex ${phase === 'active' ? 'md:w-[450px]' : 'flex-1'} w-full flex-col relative bg-[#F5F7FA] md:bg-slate-50 transition-all duration-500`}>
                 {/* Header Bar */}
                 <header className="hidden md:flex h-16 border-b border-slate-200 bg-white px-4 items-center justify-between">
-                    <div className={`flex items-center gap-${phase === 'active' ? '2' : '6'}`}>
+                    <div className={`flex items-center gap-${phase === 'active' ? '2' : '6'} flex-shrink-0`}>
                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest ${phase === 'active' ? 'bg-red-500/10 border-red-500/30 text-red-500' : 'bg-green-500/10 border-green-500 text-green-600'}`}>
                             <div className={`w-1.5 h-1.5 rounded-full ${phase === 'active' ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
                             {phase === 'active' ? 'REC' : 'Standby'}
                         </div>
-                        <span className="text-lg font-medium text-slate-900 tabular-nums">{formatTime(duration)}</span>
-                        <VoiceVisualizer isActive={phase === 'active'} />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowTranscript(prev => !prev)}
-                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all"
-                        >
-                            <Icon name="document-text" className="w-4 h-4" />
-                            <span className="hidden lg:inline">{showTranscript ? 'Hide Chat' : 'Show Chat'}</span>
-                        </button>
+                    <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+                        {showChatButton && (
+                            <button
+                                onClick={() => setShowTranscript(prev => !prev)}
+                                data-tour-id="veda-show-chat"
+                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all"
+                            >
+                                <Icon name="document-text" className="w-4 h-4" />
+                                <span className="hidden lg:inline">{showTranscript ? 'Hide Chat' : 'Show Chat'}</span>
+                            </button>
+                        )}
                         {isVoiceEditing && (
                             <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded-lg animate-fadeIn">
                                 <Icon name="microphone" className="w-3 h-3 text-purple-400 animate-pulse" />
@@ -722,11 +1062,19 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         {/* Hide tools during active recording to save space and reduce distraction */}
                         {phase !== 'active' && (
                             <>
-                                <button onClick={toggleVoiceEdit} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>
+                                <button
+                                    onClick={toggleVoiceEdit}
+                                    data-tour-id="review-voice-edit"
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${isVoiceEditing ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                >
                                     <Icon name={isProcessingVoiceEdit ? "spinner" : "microphone"} className={`w-4 h-4 ${isProcessingVoiceEdit ? 'animate-spin' : ''}`} />
                                     <span className="hidden lg:inline">Voice Edit</span>
                                 </button>
-                                <button onClick={() => setShowPdfPreview(!showPdfPreview)} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all">
+                                <button
+                                    onClick={() => setShowPdfPreview(!showPdfPreview)}
+                                    data-tour-id="review-pdf-button"
+                                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all"
+                                >
                                     <Icon name="document-text" className="w-4 h-4" />
                                     <span className="hidden lg:inline">PDF</span>
                                 </button>
@@ -734,29 +1082,24 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                         )}
 
                         {phase === 'active' && (
-                            <button onClick={handleStopSession} className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95 whitespace-nowrap">
+                            <button
+                                onClick={handleStopSession}
+                                data-tour-id="veda-stop-session"
+                                className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-900/20 transition-all active:scale-95 whitespace-nowrap"
+                            >
                                 Stop Session
                             </button>
                         )}
-                        <button onClick={onEndSession} className="p-2 text-gray-500 hover:text-white transition-colors ml-2"><Icon name="x" className="w-5 h-5" /></button>
+                        <button onClick={onEndSession} className="p-2 text-gray-500 hover:text-white transition-colors"><Icon name="x" className="w-5 h-5" /></button>
+                        <button
+                            onClick={onEndSession}
+                            data-tour-id="review-new-patient"
+                            className="hidden xl:flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border border-slate-200"
+                        >
+                            <Icon name="user-plus" className="w-4 h-4 text-blue-600" />
+                            <span>New Patient</span>
+                        </button>
                     </div>
-
-                    {/* New Patient Button */}
-                    <button
-                        onClick={onEndSession}
-                        className="hidden md:flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border border-slate-200 mr-2"
-                    >
-                        <Icon name="user-plus" className="w-4 h-4 text-blue-600" />
-                        <span>New Patient</span>
-                    </button>
-
-                    {/* Mobile New Patient (Icon Only) */}
-                    <button
-                        onClick={onEndSession}
-                        className="md:hidden p-2 text-slate-700 bg-white rounded-lg border border-slate-200 mr-2"
-                    >
-                        <Icon name="user-plus" className="w-5 h-5 text-blue-600" />
-                    </button>
                 </header>
                 {/* Active Recording Placeholder */}
                 {phase === 'active' && (
@@ -871,8 +1214,14 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                 {/* PDF Preview Modal */}
                 {showPdfPreview && (
                     <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-8" onClick={() => setShowPdfPreview(false)}>
-                        <div className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full h-full md:max-w-4xl md:max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between md:rounded-t-2xl z-10">
+                        <div
+                            className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full h-full md:max-w-4xl md:max-h-[90vh] overflow-y-auto"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div
+                                className="sticky top-0 bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between md:rounded-t-2xl z-10"
+                                data-tour-id="review-pdf-preview"
+                            >
                                 <h3 className="text-lg font-bold text-slate-900">Prescription Preview</h3>
                                 <div className="flex items-center gap-3">
                                     <button
@@ -885,10 +1234,18 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({ onEndSessi
                                                 toast.error(error.message || "Failed to update case count");
                                             }
                                         }}
+                                        data-tour-id="review-save-export"
                                         className="flex items-center gap-2 px-4 py-2 bg-[#3B6FE0] md:bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-blue-600/20"
                                     >
                                         <Icon name="download" className="w-4 h-4" />
                                         <span>Download PDF</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+                                    >
+                                        <Icon name="upload" className="w-4 h-4" />
+                                        <span>Push to EMR</span>
                                     </button>
                                     <button onClick={() => setShowPdfPreview(false)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                                         <Icon name="close" className="w-5 h-5 text-slate-600" />

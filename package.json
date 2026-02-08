@@ -2,14 +2,21 @@
   "name": "opd-platform",
   "private": true,
   "description": "OPD Platform hosted at opd.aivanahealth.com",
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "author": "Aivana Health",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
     "dev:all": "concurrently \"npm run dev\" \"npm run server:dev\"",
     "build": "vite build",
     "preview": "vite preview",
     "server": "tsx server/index.ts",
-    "server:dev": "tsx watch server/index.ts"
+    "server:dev": "tsx watch server/index.ts",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "npm run build && electron-builder --win --x64",
+    "electron:build:portable": "npm run build && electron-builder --win portable --x64",
+    "package:exe": "npm run build && electron-builder --win --x64"
   },
   "dependencies": {
     "@google/genai": "^1.19.0",
@@ -32,8 +39,12 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.13.3",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "wait-on": "^7.2.0"
   }
 }

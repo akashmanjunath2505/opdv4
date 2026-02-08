@@ -1,0 +1,52 @@
+{
+  "appId": "com.aivanahealth.opdplatform",
+  "productName": "Aivana Doc",
+  "copyright": "Copyright © 2026 Aivana Health",
+  "directories": {
+    "output": "release",
+    "buildResources": "assets"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.js"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "artifactName": "${productName}-${version}-Setup.${ext}",
+    "publisherName": "Aivana Health",
+    "sign": null,
+    "signingHashAlgorithms": []
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Aivana Doc",
+    "deleteAppDataOnUninstall": false
+  },
+  "portable": {
+    "artifactName": "${productName}-${version}-Portable.${ext}"
+  },
+  "mac": {
+    "target": ["dmg"],
+    "category": "public.app-category.medical"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "category": "Office;Medical"
+  }
+}

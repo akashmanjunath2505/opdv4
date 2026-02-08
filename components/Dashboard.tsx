@@ -11,7 +11,7 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade }) => {
     const { user, logout } = useAuth();
-    const [selectedLanguage, setSelectedLanguage] = React.useState("Automatic Language Detection");
+    const [selectedLanguages, setSelectedLanguages] = React.useState<string[]>(["Automatic Language Detection"]);
     const [showContactForm, setShowContactForm] = React.useState(false);
     const [isSubmittingContact, setIsSubmittingContact] = React.useState(false);
     const [contactForm, setContactForm] = React.useState({
@@ -172,7 +172,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+                <div
+                    className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8"
+                    data-tour-id="dashboard-usage"
+                >
                     {/* Today's Cases */}
                     <div className="bg-white rounded-[12px] md:rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.06)] md:shadow-sm p-4 md:p-6">
                         <div className="flex items-start justify-between mb-1.5">
@@ -198,7 +201,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                     </div>
 
                     {/* Subscription */}
-                    <div className="bg-white rounded-[12px] md:rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.06)] md:shadow-sm p-4 md:p-6 col-span-2 md:col-span-1">
+                    <div
+                        className="bg-white rounded-[12px] md:rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.06)] md:shadow-sm p-4 md:p-6 col-span-2 md:col-span-1"
+                        data-tour-id="dashboard-pricing"
+                    >
                         <div className="flex items-start justify-between mb-1.5">
                             <h3 className="text-[10px] uppercase tracking-wider text-[#9CA3AF] md:text-sm md:normal-case md:tracking-normal md:text-slate-600">Subscription</h3>
                             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-base">💎</div>
@@ -333,19 +339,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                             </p>
                         </div>
 
-                        <div className="mb-5 md:mb-6">
+                        <div className="mb-5 md:mb-6" data-tour-id="dashboard-language">
                             <label className="block text-left text-[10px] uppercase tracking-wider font-semibold text-[#6B7280] md:text-sm md:normal-case md:tracking-normal md:font-medium md:text-slate-700 mb-2">
                                 Consultation Language
                             </label>
                             <LanguageSelector
-                                value={selectedLanguage}
-                                onChange={setSelectedLanguage}
+                                value={selectedLanguages}
+                                onChange={setSelectedLanguages}
                             />
                         </div>
 
                         <button
-                            onClick={() => onStartSession(selectedLanguage)}
+                            onClick={() => {
+                                const sessionLanguage = selectedLanguages.includes("Automatic Language Detection")
+                                    ? "Automatic Language Detection"
+                                    : selectedLanguages.join(", ");
+                                onStartSession(sessionLanguage);
+                            }}
                             disabled={isFreeTier && casesRemaining === 0}
+                            data-tour-id="dashboard-start-session"
                             className="w-full min-h-[48px] bg-[#3B6FE0] md:bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl md:rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base md:text-lg shadow-lg shadow-blue-900/10"
                         >
                             {isFreeTier && casesRemaining === 0 ? 'Upgrade to Continue' : 'Start Veda Session'}
