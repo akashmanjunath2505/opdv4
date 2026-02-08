@@ -130,13 +130,23 @@ export const GuidedWalkthroughOverlay: React.FC<GuidedWalkthroughOverlayProps> =
 
         const placement: Placement = step?.placement || 'right';
         const offset = 16;
-        const bubbleWidth = 320;
-        const bubbleHeight = 180;
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
+        const isMobile = viewportWidth < 640;
+        const bubbleWidth = Math.min(440, Math.max(280, viewportWidth - 32));
+        const bubbleHeight = isMobile ? 320 : 220;
 
         let top = rect.top;
         let left = rect.left;
+
+        if (isMobile) {
+            return {
+                left: 16,
+                right: 16,
+                bottom: 16,
+                top: 'auto',
+            } as React.CSSProperties;
+        }
 
         switch (placement) {
             case 'top':
@@ -158,8 +168,8 @@ export const GuidedWalkthroughOverlay: React.FC<GuidedWalkthroughOverlayProps> =
         }
 
         return {
-            top: clamp(top, 16, viewportHeight - bubbleHeight - 16),
-            left: clamp(left, 16, viewportWidth - bubbleWidth - 16),
+            top: clamp(top, 16, Math.max(16, viewportHeight - bubbleHeight - 16)),
+            left: clamp(left, 16, Math.max(16, viewportWidth - bubbleWidth - 16)),
         };
     }, [rect, step]);
 
@@ -181,17 +191,17 @@ export const GuidedWalkthroughOverlay: React.FC<GuidedWalkthroughOverlayProps> =
             )}
 
             <div
-                className="absolute w-[440px]"
+                className="absolute w-[440px] max-w-[calc(100vw-32px)]"
                 style={bubbleStyle}
             >
-                <div className="flex items-start gap-4">
+                <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start sm:gap-4">
                     <img
                         src={nurseImageUrl}
                         alt="Nurse guide"
-                        className="w-48 h-48 object-contain drop-shadow-md"
+                        className="w-28 h-28 sm:w-48 sm:h-48 object-contain drop-shadow-md"
                     />
-                    <div className="flex-1">
-                        <div className="relative bg-white border border-slate-200 shadow-2xl rounded-3xl px-6 py-4">
+                    <div className="flex-1 w-full">
+                        <div className="relative bg-white border border-slate-200 shadow-2xl rounded-3xl px-5 py-4 max-h-[65vh] sm:max-h-[70vh] overflow-y-auto">
                             <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Nurse Guide</div>
                             <div className="text-base font-semibold text-slate-900">{step.title}</div>
                             <p className="mt-2 text-base text-slate-700 leading-relaxed">
@@ -215,7 +225,7 @@ export const GuidedWalkthroughOverlay: React.FC<GuidedWalkthroughOverlayProps> =
                                     </select>
                                 </div>
                             )}
-                            <div className="absolute -left-3 top-8 h-5 w-5 bg-white border-l border-t border-slate-200 rotate-45"></div>
+                            <div className="absolute -left-3 top-8 h-5 w-5 bg-white border-l border-t border-slate-200 rotate-45 hidden sm:block"></div>
                         </div>
 
                         <div className="mt-3 flex items-center justify-between">
