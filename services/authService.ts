@@ -269,11 +269,12 @@ class AuthService {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: isLocal ? origin : redirectTo
+                redirectTo: isLocal ? `${origin}/` : `${redirectTo.replace(/\/$/, '')}/`
             }
         });
 
         if (error) throw new Error(error.message);
+        if (data?.url) window.location.href = data.url;
         return data;
     }
 
