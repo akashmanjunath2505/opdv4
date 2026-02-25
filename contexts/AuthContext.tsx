@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Listen for Real-time Auth State Changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth State Change:', event);
+            if (event !== 'INITIAL_SESSION') console.log('Auth State Change:', event);
 
             if (event === 'SIGNED_IN' && session) {
                 localStorage.removeItem(guestSessionKey);
