@@ -62,7 +62,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ value, onCha
     };
 
     return (
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative" ref={dropdownRef} data-language-selector-root="true">
             <div
                 onClick={() => {
                     setIsOpen(!isOpen);

@@ -16,7 +16,7 @@ export interface User {
     hospital_name?: string;
     hospital_address?: string;
     hospital_phone?: string;
-    subscription_tier: 'free' | 'premium';
+    subscription_tier: 'free' | 'premium' | 'pro';
     subscription_status: string;
     cases_today: number;
     total_cases: number;

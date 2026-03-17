@@ -29,29 +29,29 @@ export const UsageLimitModal: React.FC<UsageLimitModalProps> = ({
 
                 {/* Title */}
                 <h2 className="text-2xl font-bold text-slate-900 text-center mb-2">
-                    Daily Limit Reached
+                    Usage Limit Reached
                 </h2>
 
                 {/* Message */}
                 <p className="text-slate-600 text-center mb-6">
-                    You've used <span className="font-semibold text-slate-900">{casesToday} of {limit}</span> cases today on the Free plan.
+                    You've used <span className="font-semibold text-slate-900">{casesToday} of {limit}</span> sessions allowed on your current plan.
                 </p>
 
                 {/* Features */}
                 <div className="bg-slate-50 rounded-lg p-4 mb-6">
-                    <h3 className="font-semibold text-slate-900 mb-3">Upgrade to Premium</h3>
+                    <h3 className="font-semibold text-slate-900 mb-3">Talk to us to upgrade</h3>
                     <ul className="space-y-2">
                         <li className="flex items-start gap-2 text-sm text-slate-700">
                             <span className="text-blue-600 mt-0.5">✓</span>
-                            <span><strong>Unlimited cases</strong> per day</span>
+                            <span><strong>Higher daily limits</strong> tailored to your OPD</span>
                         </li>
                         <li className="flex items-start gap-2 text-sm text-slate-700">
                             <span className="text-blue-600 mt-0.5">✓</span>
-                            <span>Priority support</span>
+                            <span>Priority onboarding and support</span>
                         </li>
                         <li className="flex items-start gap-2 text-sm text-slate-700">
                             <span className="text-blue-600 mt-0.5">✓</span>
-                            <span>Advanced analytics</span>
+                            <span>Advanced analytics & reporting</span>
                         </li>
                         <li className="flex items-start gap-2 text-sm text-slate-700">
                             <span className="text-blue-600 mt-0.5">✓</span>
@@ -60,10 +60,11 @@ export const UsageLimitModal: React.FC<UsageLimitModalProps> = ({
                     </ul>
                 </div>
 
-                {/* Pricing */}
+                {/* Note */}
                 <div className="text-center mb-6">
-                    <p className="text-3xl font-bold text-slate-900">₹2,000<span className="text-lg font-normal text-slate-600">/month</span></p>
-                    <p className="text-sm text-amber-600 font-medium mt-1">Limited offer: First 100 clinicians only!</p>
+                    <p className="text-sm text-slate-600">
+                        Share your details and our team will reach out with the best plan for your hospital or clinic.
+                    </p>
                 </div>
 
                 {/* Actions */}
@@ -78,13 +79,13 @@ export const UsageLimitModal: React.FC<UsageLimitModalProps> = ({
                         onClick={onUpgrade}
                         className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors"
                     >
-                        Upgrade Now
+                        Contact Us
                     </button>
                 </div>
 
                 {/* Reset Info */}
                 <p className="text-xs text-slate-500 text-center mt-4">
-                    Your free cases will reset tomorrow at midnight
+                    Free plan limits reset daily. Upgraded plans can unlock higher limits.
                 </p>
             </div>
         </div>

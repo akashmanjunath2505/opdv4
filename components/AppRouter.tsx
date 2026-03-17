@@ -8,6 +8,7 @@ import { ScribeSessionView } from './VedaSessionView';
 import { UsageLimitModal } from './UsageLimitModal';
 import { PricingPage } from './PricingPage';
 import { GuidedWalkthroughOverlay, WalkthroughStep } from './GuidedWalkthroughOverlay';
+import { LanguageReminderBubble } from './LanguageReminderBubble';
 import { LANGUAGES } from '../utils/languages';
 import { DoctorProfile } from '../types';
 
@@ -23,6 +24,12 @@ export const AppRouter: React.FC = () => {
     const [dashboardTourStep, setDashboardTourStep] = useState(0);
     const [showVedaTour, setShowVedaTour] = useState(false);
     const [walkthroughLanguage, setWalkthroughLanguage] = useState("English (UK)");
+    const [showLanguageReminder, setShowLanguageReminder] = useState(false);
+
+    const getDailySessionLimit = (tier: string | null | undefined) => {
+        if (tier === 'pro' || tier === 'premium') return 100;
+        return 10;
+    };
 
     const dashboardCopy = useMemo(() => {
         const translations = {
@@ -138,6 +145,28 @@ export const AppRouter: React.FC = () => {
         }
     }, [user, loading, profileIncomplete, inSession, showPricing]);
 
+    useEffect(() => {
+        if (!user || loading) return;
+        const isGuestUser = user.email === 'guest@local' || user.id.startsWith('guest-');
+        if (profileIncomplete && !isGuestUser) return;
+        if (inSession || showPricing) return;
+
+        const onboardingKey = `has_seen_onboarding_${user.id}`;
+        const hasSeenOnboarding = localStorage.getItem(onboardingKey) === 'true';
+        if (!hasSeenOnboarding) return;
+
+        const reminderKey = `language_reminder_shown_count_${user.id}`;
+        const rawCount = localStorage.getItem(reminderKey);
+        const parsed = rawCount ? parseInt(rawCount, 10) : 0;
+        const currentCount = Number.isNaN(parsed) ? 0 : parsed;
+
+        if (currentCount < 3) {
+            const nextCount = currentCount + 1;
+            localStorage.setItem(reminderKey, String(nextCount));
+            setShowLanguageReminder(true);
+        }
+    }, [user, loading, profileIncomplete, inSession, showPricing]);
+
     // Loading state
     if (loading) {
         return (
@@ -164,9 +193,10 @@ export const AppRouter: React.FC = () => {
     }
 
     const handleStartSession = async (language: string) => {
-        // Check if user has reached limit
-        if (user.subscription_tier === 'free' && user.cases_today >= 10) {
-            setUsageLimitInfo({ casesToday: user.cases_today, limit: 10 });
+        // Check if user has reached per-day limit based on subscription tier
+        const limit = getDailySessionLimit(user.subscription_tier);
+        if (user.cases_today >= limit) {
+            setUsageLimitInfo({ casesToday: user.cases_today, limit });
             setShowUsageLimitModal(true);
             return;
         }
@@ -186,8 +216,25 @@ export const AppRouter: React.FC = () => {
         await refreshUser();
     };
 
-    const handleUpgrade = () => {
+    const handleUpgrade = async () => {
         setShowUsageLimitModal(false);
+        try {
+            await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    clinic: user.hospital_name,
+                    message: 'Upgrade request from in-app usage limit popup.',
+                    reason: 'usage_limit',
+                    userId: user.id
+                })
+            });
+        } catch {
+            // Silent failure; user can still use other contact routes
+        }
         setShowPricing(true);
     };
 
@@ -225,6 +272,9 @@ export const AppRouter: React.FC = () => {
     return (
         <>
             <Dashboard onStartSession={handleStartSession} onUpgrade={() => setShowPricing(true)} />
+            {showLanguageReminder && (
+                <LanguageReminderBubble onDismiss={() => setShowLanguageReminder(false)} />
+            )}
             <GuidedWalkthroughOverlay
                 isOpen={showDashboardTour}
                 steps={dashboardSteps}

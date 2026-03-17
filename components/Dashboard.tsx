@@ -25,7 +25,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
     if (!user) return null;
 
     const isFreeTier = user.subscription_tier === 'free';
-    const casesRemaining = isFreeTier ? Math.max(0, 10 - user.cases_today) : null;
+    const isProTier = user.subscription_tier === 'pro' || user.subscription_tier === 'premium';
+    const dailyLimit = isFreeTier ? 10 : (isProTier ? 100 : 10);
+    const casesRemaining = Math.max(0, dailyLimit - user.cases_today);
     const isLimitReached = isFreeTier && casesRemaining === 0;
 
     useEffect(() => {
@@ -92,7 +94,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                                 ? 'bg-slate-100 text-slate-700'
                                 : 'bg-blue-100 text-blue-700'
                                 }`}>
-                                {isFreeTier ? 'Free Plan' : 'Premium'}
+                                {isFreeTier ? 'Free Plan' : 'Pro Plan'}
                             </div>
 
                             {/* User Menu */}
@@ -127,7 +129,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                                 ? 'bg-slate-100 text-slate-700'
                                 : 'bg-blue-100 text-blue-700'
                                 }`}>
-                                {isFreeTier ? 'Free Plan' : 'Premium'}
+                                {isFreeTier ? 'Free Plan' : 'Pro Plan'}
                             </div>
                             <details className="relative">
                                 <summary className="list-none cursor-pointer">
@@ -217,25 +219,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                                 onClick={() => setShowContactForm(prev => !prev)}
                                 className="text-[11px] md:text-sm text-[#3B6FE0] md:text-blue-600 hover:text-blue-700 font-medium mt-1"
                             >
-                                {showContactForm ? 'Hide contact form' : 'Contact us for Premium →'}
+                                {showContactForm ? 'Hide contact form' : 'Contact us to upgrade →'}
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* Usage Limit Warning (Free Tier) */}
-                {isFreeTier && casesRemaining !== null && casesRemaining <= 2 && (
+                {/* Usage Limit Warning (Any Tier) */}
+                {casesRemaining <= 2 && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 md:mb-8">
                         <div className="flex items-start gap-3">
                             <span className="text-2xl">⚠️</span>
                             <div>
                                 <h3 className="font-medium text-amber-900 mb-1">
-                                    {casesRemaining === 0 ? 'Daily Limit Reached' : `Only ${casesRemaining} case${casesRemaining === 1 ? '' : 's'} remaining today`}
+                                    {casesRemaining === 0 ? 'Daily Limit Reached' : `Only ${casesRemaining} session${casesRemaining === 1 ? '' : 's'} remaining today`}
                                 </h3>
                                 <p className="text-sm text-amber-700 mb-2">
                                     {casesRemaining === 0
-                                        ? 'You\'ve reached your daily limit of 10 cases. Contact us to unlock Premium.'
-                                        : 'Upgrade to Premium for unlimited cases and priority support.'}
+                                        ? `You've reached your daily limit of ${dailyLimit} sessions. Contact us to upgrade.`
+                                        : 'Upgrade to increase your daily session limit and get priority support.'}
                                 </p>
                                 {casesRemaining === 0 && (
                                     <button

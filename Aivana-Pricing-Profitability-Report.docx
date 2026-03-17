@@ -1,0 +1,180 @@
+Title: Aivana Doc – Hospital Pricing Profitability Assessment
+Date: March 2026
+Prepared for: Aivana Health Intelligence Pvt. Ltd.
+
+1. Objective
+
+Goal: Evaluate whether the proposed per‑doctor hospital pricing model for Aivana Doc (AI‑powered OPD documentation) is financially viable and profitable, considering realistic infrastructure costs (Supabase, Vercel, Gemini API, etc.).
+
+2. Pricing Model Summary
+
+Plans (from current pricing sheet):
+
+Clinic Plan
+- ₹2,499/doctor/month
+- Best for: 1–4 doctors
+
+Hospital Plan (volume pricing)
+- 5–10 doctors: ₹1,999/doctor/month
+- 11–25 doctors: ₹1,799/doctor/month
+- 26–50 doctors: ₹1,599/doctor/month
+- 51–100 doctors: ₹1,399/doctor/month
+- 100+ doctors: Custom (target ~50%+ discount vs clinic)
+
+Annual payment discount (for hospitals)
+- Monthly: no discount (e.g., ₹1,999)
+- Quarterly: ~5% discount
+- Annual: ~20% discount → effective ₹1,599–₹1,279/doctor/month at higher tiers
+
+Example effective monthly pricing (annual contracts)
+- 10 doctors: ₹1,599/doctor ⇒ ₹15,990/month
+- 20 doctors: ₹1,439/doctor ⇒ ₹28,780/month
+- 50 doctors: ₹1,279/doctor ⇒ ₹63,950/month
+
+3. Infrastructure Stack and Assumptions
+
+Planned stack:
+- Backend and Auth: Supabase (managed Postgres, auth, storage)
+- Frontend and App hosting: Vercel (Next.js or similar)
+- LLM and AI engine: Google Gemini API (for example, Gemini 3 Flash or Flash‑Lite for production)
+
+Key assumptions (conservative):
+- Consult volume per doctor:
+  - 30 consults per day
+  - 22 working days per month
+  - Approximately 660 consults per doctor per month
+
+- Tokens per consult (voice to text to notes):
+  - 3,000 input tokens + 1,000 output tokens = 4,000 tokens per consult
+  - Approximately 2.64 million tokens per doctor per month
+
+- Gemini 3 Flash pricing (2026, approximate per 1,000 tokens):
+  - Input: $0.0005 per 1,000 tokens
+  - Output: $0.003 per 1,000 tokens
+
+This is intentionally a heavy-usage assumption. With prompt optimization, Flash‑Lite, and caching, actual tokens per consult are usually lower.
+
+4. Estimated Monthly Infrastructure Cost per Doctor
+
+LLM cost (per doctor per month, with the assumptions above):
+- Input:
+  - 2.64 million tokens × $0.0005 per 1,000 ≈ $1.32
+- Output:
+  - 2.64 million tokens × $0.003 per 1,000 ≈ $7.92
+- Total LLM cost ≈ $9.24 per doctor per month
+
+At ₹83 ≈ $1:
+- Approximately ₹765 per doctor per month
+
+With lighter prompts or Flash‑Lite, realistic cost often reduces to ₹200–500 per doctor per month.
+
+Shared infrastructure (per project, per month):
+- Supabase Pro: $25–75 (₹2,000–6,000)
+- Vercel Pro: $20–40 (₹1,600–3,300)
+- Other tools (monitoring, logging, emails, etc.): about ₹2,000–4,000
+
+Total fixed infrastructure (example): approximately ₹8,000–12,000 per month, shared across all customers and all doctors.
+
+If a single multi‑tenant stack serves 100 doctors, then:
+- Fixed infrastructure allocation is about ₹80–120 per doctor per month.
+
+5. Revenue versus Direct Infrastructure Cost
+
+5.1 Single 20‑Doctor Hospital (Annual Best Rate)
+
+Revenue:
+- 20 doctors × ₹1,439 per doctor ≈ ₹28,780 per month
+
+LLM cost (conservative):
+- 20 × ₹500–765 ≈ ₹10,000–15,300 per month
+- Use midpoint ≈ ₹12,500 per month
+
+Fixed infrastructure allocation (assuming 100 doctors on the platform):
+- Per doctor: about ₹100 per month
+- 20 doctors ⇒ about ₹2,000 per month
+
+Total direct infrastructure cost:
+- Approximately ₹14,500 per month
+
+Gross margin on infrastructure:
+- Revenue: ₹28,780
+- Direct cost: ₹14,500
+- Gross profit: about ₹14,280 per month
+- Infrastructure gross margin: about 50 percent
+
+With more realistic, optimized LLM usage (₹300 per doctor per month), the margin exceeds 65–70 percent.
+
+5.2 50‑Doctor Hospital (Annual Best Rate)
+
+Revenue:
+- 50 × ₹1,279 ≈ ₹63,950 per month
+
+LLM cost (assume ₹400–700 per doctor):
+- Midpoint ₹550 × 50 ≈ ₹27,500 per month
+
+Fixed infrastructure allocation (100–150 total doctors):
+- Assume about ₹80 per doctor → 50 × 80 ≈ ₹4,000 per month
+
+Total direct infrastructure cost:
+- Approximately ₹31,500 per month
+
+Gross profit (infrastructure):
+- ₹63,950 – ₹31,500 ≈ ₹32,450 per month
+- Infrastructure gross margin: approximately 50–60 percent
+
+Again, with better optimization, Gemini cost can drop materially, lifting margins.
+
+6. Profitability Conclusion
+
+Based on the above:
+- Per‑doctor revenue (₹1,279–2,499) is significantly higher than realistic per‑doctor infrastructure cost (typically ≤ ₹500–1,000, often lower with Flash‑Lite and caching).
+- Even under aggressive usage assumptions and no heavy optimization, direct gross margins of 50 percent or more on infrastructure alone are achievable.
+- As the total number of doctors on the platform grows, fixed costs (Supabase, Vercel, tooling) are amortized, improving margin further.
+- Therefore, this pricing model is fundamentally profitable from a unit‑economics and infrastructure‑cost perspective, assuming:
+  - Multi‑tenant architecture (not one full stack per hospital),
+  - Sensible LLM choice (Gemini Flash or Flash‑Lite, not only Pro),
+  - Basic token usage optimization.
+
+7. Key Risks and Non‑Infrastructure Cost Drivers
+
+While infrastructure costs are favorable, profitability can be eroded by:
+
+1. Sales and Customer Acquisition Cost (CAC)
+   - High‑touch enterprise sales for small deals (5–10 doctors) can make CAC payback longer.
+   - Mitigation:
+     - Standardized demos, partner channels, and a focused ideal customer profile (for example, 10–50‑doctor hospitals).
+
+2. Support and Onboarding Load
+   - On‑site training, EMR/HMS integrations, and 24/7 WhatsApp support consume time.
+   - If you promise these for very small contracts, margin shrinks.
+   - Mitigation:
+     - Limit on‑site training in lower tiers or make it a paid add‑on.
+     - Use remote onboarding and recorded training content.
+
+3. Overuse of Expensive LLM Models
+   - Using Gemini Pro for every request instead of Flash or Flash‑Lite can multiply token cost.
+   - Mitigation:
+     - Route most traffic to cheaper models.
+     - Use Pro only for complex or rare operations.
+     - Implement context caching and prompt compression.
+
+4. Inefficient Architecture
+   - Spinning up separate Supabase and Vercel projects per hospital instead of a multi‑tenant system increases both complexity and cost.
+   - Mitigation:
+     - Design early for multi‑tenancy (for example, organization or hospital scoping).
+     - Centralize logging and monitoring.
+
+8. Recommendations
+
+- Keep current per‑doctor pricing bands; they are comfortably profitable against infrastructure.
+- Standardize on Gemini Flash or Flash‑Lite as the default engine; reserve Pro for special cases.
+- Enforce multi‑tenant architecture to share Supabase, Vercel, and observability costs across all hospitals.
+- Treat on‑site training, custom integrations, and dedicated support as add‑ons or bundle them only in larger contracts (for example, 20–30 doctors or more).
+- Build a simple internal “unit economics” spreadsheet where you track:
+  - Doctors per customer
+  - Tokens per consult
+  - Gemini cost per month
+  - Infrastructure cost per month
+  - Revenue and gross margin per customer
+
+This will let you monitor in real time if any hospital or segment is drifting towards unprofitable usage, and adjust pricing or product limits accordingly.

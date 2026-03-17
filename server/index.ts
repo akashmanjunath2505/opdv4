@@ -6,6 +6,8 @@ type ContactPayload = {
   phone?: string;
   clinic?: string;
   message: string;
+  reason?: string;
+  userId?: string;
 };
 
 const sendEmail = async (payload: ContactPayload) => {
@@ -14,13 +16,17 @@ const sendEmail = async (payload: ContactPayload) => {
     throw new Error('Missing RESEND_API_KEY');
   }
 
-  const subject = `Premium Inquiry from ${payload.name}`;
+  const subject = payload.reason === 'usage_limit'
+    ? `Upgrade Request (Usage Limit) from ${payload.name}`
+    : `Premium Inquiry from ${payload.name}`;
   const html = `
     <h2>Premium Contact Request</h2>
     <p><strong>Name:</strong> ${payload.name}</p>
     <p><strong>Email:</strong> ${payload.email}</p>
     ${payload.phone ? `<p><strong>Phone:</strong> ${payload.phone}</p>` : ''}
     ${payload.clinic ? `<p><strong>Clinic:</strong> ${payload.clinic}</p>` : ''}
+    ${payload.reason ? `<p><strong>Reason:</strong> ${payload.reason}</p>` : ''}
+    ${payload.userId ? `<p><strong>User ID:</strong> ${payload.userId}</p>` : ''}
     <p><strong>Message:</strong></p>
     <p>${payload.message.replace(/\n/g, '<br/>')}</p>
   `;

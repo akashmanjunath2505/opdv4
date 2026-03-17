@@ -213,6 +213,7 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({
     const [reviewTourActive, setReviewTourActive] = useState(false);
     const [reviewTourStep, setReviewTourStep] = useState(0);
     const [showPdfPreview, setShowPdfPreview] = useState(false);
+    const hasCountedRef = useRef(false);
 
     const translations = {
         'English (UK)': {
@@ -495,6 +496,14 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({
     }, [isRecording]);
 
     useEffect(() => {
+        if (!user || tourMode) return;
+        if (user.subscription_tier === 'free' && duration >= 600 && isRecording) {
+            toast.error('Free plan: 10-minute limit reached for this session.');
+            handleStopSession();
+        }
+    }, [duration, user, tourMode, isRecording, handleStopSession]);
+
+    useEffect(() => {
         transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [transcriptHistory, interimTranscript]);
 
@@ -731,6 +740,15 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({
                     console.error('Failed to save prescription:', error);
                 }
             }
+            if (!hasCountedRef.current) {
+                try {
+                    await incrementCaseCount();
+                    await refreshUser();
+                    hasCountedRef.current = true;
+                } catch (error) {
+                    console.error('Failed to increment case count:', error);
+                }
+            }
             return;
         }
 
@@ -775,6 +793,15 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({
                     });
                 } catch (error) {
                     console.error('Failed to save prescription:', error);
+                }
+            }
+            if (!hasCountedRef.current) {
+                try {
+                    await incrementCaseCount();
+                    await refreshUser();
+                    hasCountedRef.current = true;
+                } catch (error) {
+                    console.error('Failed to increment case count:', error);
                 }
             }
         }
