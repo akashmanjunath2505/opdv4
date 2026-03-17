@@ -13,28 +13,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onClose }) => {
     const handleUpgrade = async () => {
         setLoading(true);
         setError('');
-
         try {
-            const token = localStorage.getItem('auth_token');
-            const response = await fetch('/api/subscription/create-checkout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                }
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to create checkout session');
-            }
-
-            const { url } = await response.json();
-
-            // Redirect to Stripe Checkout
-            window.location.href = url;
+            window.open('https://calendly.com/abhisheknahire89/30min', '_blank', 'noopener,noreferrer');
         } catch (err: any) {
-            setError(err.message || 'Failed to start checkout');
+            setError(err.message || 'Failed to open booking link');
+        } finally {
             setLoading(false);
         }
     };

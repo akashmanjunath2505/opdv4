@@ -252,7 +252,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                     </div>
                 )}
 
-                {isFreeTier && showContactForm && (
+                        {isFreeTier && showContactForm && (
                     <div className="bg-white rounded-[16px] md:rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.06)] md:shadow-sm p-4 md:p-6 mb-6 md:mb-8">
                         <div className="flex items-start justify-between mb-4">
                             <div>
@@ -316,11 +316,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                             </div>
                             <div className="md:col-span-2 flex items-center gap-3">
                                 <button
-                                    type="submit"
+                                    type="button"
                                     disabled={isSubmittingContact}
+                                    onClick={() => window.open('https://calendly.com/abhisheknahire89/30min', '_blank', 'noopener,noreferrer')}
                                     className="min-h-[44px] px-5 py-2 rounded-xl bg-[#3B6FE0] hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-60"
                                 >
-                                    {isSubmittingContact ? 'Sending...' : 'Send Request'}
+                                    {isSubmittingContact ? 'Opening...' : 'Book a Call'}
                                 </button>
                                 <span className="text-[11px] text-[#9CA3AF]">We respond within 24 hours.</span>
                             </div>

@@ -27,7 +27,7 @@ export const UsageLimitBanner: React.FC = () => {
                             You've used all {usage.limit} free cases for today. Upgrade to continue without limits.
                         </p>
                         <button
-                            onClick={() => window.location.href = 'https://aivanahealth.com#pricing'}
+                            onClick={() => window.open('https://calendly.com/abhisheknahire89/30min', '_blank', 'noopener,noreferrer')}
                             className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                         >
                             <TrendingUp className="w-4 h-4" />

@@ -153,7 +153,10 @@ export const AppRouter: React.FC = () => {
 
         const onboardingKey = `has_seen_onboarding_${user.id}`;
         const hasSeenOnboarding = localStorage.getItem(onboardingKey) === 'true';
-        if (!hasSeenOnboarding) return;
+        const storedLanguage = localStorage.getItem(`walkthrough_language_${user.id}`);
+
+        // Show reminders if either onboarding is complete OR a walkthrough language was chosen before
+        if (!hasSeenOnboarding && !storedLanguage) return;
 
         const reminderKey = `language_reminder_shown_count_${user.id}`;
         const rawCount = localStorage.getItem(reminderKey);
@@ -218,24 +221,7 @@ export const AppRouter: React.FC = () => {
 
     const handleUpgrade = async () => {
         setShowUsageLimitModal(false);
-        try {
-            await fetch('/api/contact', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: user.name,
-                    email: user.email,
-                    phone: user.phone,
-                    clinic: user.hospital_name,
-                    message: 'Upgrade request from in-app usage limit popup.',
-                    reason: 'usage_limit',
-                    userId: user.id
-                })
-            });
-        } catch {
-            // Silent failure; user can still use other contact routes
-        }
-        setShowPricing(true);
+        window.open('https://calendly.com/abhisheknahire89/30min', '_blank', 'noopener,noreferrer');
     };
 
     // Show pricing page
@@ -271,7 +257,7 @@ export const AppRouter: React.FC = () => {
     // Authenticated - show dashboard
     return (
         <>
-            <Dashboard onStartSession={handleStartSession} onUpgrade={() => setShowPricing(true)} />
+            <Dashboard onStartSession={handleStartSession} onUpgrade={handleUpgrade} />
             {showLanguageReminder && (
                 <LanguageReminderBubble onDismiss={() => setShowLanguageReminder(false)} />
             )}
