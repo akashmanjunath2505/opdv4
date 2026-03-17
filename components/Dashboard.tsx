@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { LanguageSelector } from './LanguageSelector';
 import { Icon } from './Icon';
 import toast from 'react-hot-toast';
+import { getDailySessionLimit, getCasesRemaining } from '../utils/usageRules';
 
 interface DashboardProps {
     onStartSession: (language: string) => void;
@@ -25,9 +26,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
     if (!user) return null;
 
     const isFreeTier = user.subscription_tier === 'free';
-    const isProTier = user.subscription_tier === 'pro' || user.subscription_tier === 'premium';
-    const dailyLimit = isFreeTier ? 10 : (isProTier ? 100 : 10);
-    const casesRemaining = Math.max(0, dailyLimit - user.cases_today);
+    const dailyLimit = getDailySessionLimit(user.subscription_tier);
+    const casesRemaining = getCasesRemaining(user);
     const isLimitReached = isFreeTier && casesRemaining === 0;
 
     useEffect(() => {

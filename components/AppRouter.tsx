@@ -11,6 +11,7 @@ import { GuidedWalkthroughOverlay, WalkthroughStep } from './GuidedWalkthroughOv
 import { LanguageReminderBubble } from './LanguageReminderBubble';
 import { LANGUAGES } from '../utils/languages';
 import { DoctorProfile } from '../types';
+import { getDailySessionLimit } from '../utils/usageRules';
 
 export const AppRouter: React.FC = () => {
     const { user, loading, refreshUser, profileIncomplete } = useAuth();
@@ -25,11 +26,6 @@ export const AppRouter: React.FC = () => {
     const [showVedaTour, setShowVedaTour] = useState(false);
     const [walkthroughLanguage, setWalkthroughLanguage] = useState("English (UK)");
     const [showLanguageReminder, setShowLanguageReminder] = useState(false);
-
-    const getDailySessionLimit = (tier: string | null | undefined) => {
-        if (tier === 'pro' || tier === 'premium') return 100;
-        return 10;
-    };
 
     const dashboardCopy = useMemo(() => {
         const translations = {
