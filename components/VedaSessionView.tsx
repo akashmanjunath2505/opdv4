@@ -662,16 +662,6 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({
             setShowTranscript(true);
             return;
         }
-
-        const latestTranscript = transcriptHistoryRef.current;
-        if (isTranscriptTooShortForNotes(latestTranscript)) {
-            const confirmEnd = window.confirm(
-                "We haven’t captured enough audio to generate reliable notes yet.\n\nEnd session anyway without notes?"
-            );
-            if (!confirmEnd) {
-                return;
-            }
-        }
         stopListening();
         setPhase('processing');
         const finalBlob = await stopRecording();
