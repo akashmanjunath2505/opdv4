@@ -68,6 +68,10 @@ export const processAudioSegment = async (
   doctorProfile: DoctorProfile,
   previousContext: string = ""
 ): Promise<{ speaker: 'Doctor' | 'Patient'; text: string }[] | null> => {
+  if (!base64Audio || base64Audio.trim().length === 0) {
+    console.warn("processAudioSegment: Skipping empty audio payload.");
+    return null;
+  }
   const systemInstruction = `
     You are an advanced Medical Scribe specialized in Indian clinical contexts.
 
@@ -123,7 +127,15 @@ export const processAudioSegment = async (
       },
     });
 
-    return JSON.parse(response.text || '[]');
+    const raw = response.text || '[]';
+    const parsed = JSON.parse(raw) as { speaker: 'Doctor' | 'Patient'; text: string }[];
+    // Filter out any empty or whitespace-only turns
+    const cleaned = parsed.filter(p => p && typeof p.text === 'string' && p.text.trim().length > 0);
+    if (cleaned.length === 0) {
+      console.warn("processAudioSegment: Model returned no usable transcript; skipping segment.");
+      return null;
+    }
+    return cleaned;
   } catch (error) {
     console.error("Segment processing error:", error);
     return null;
@@ -249,6 +261,11 @@ export const generateClinicalNote = async (
   doctorProfile: DoctorProfile,
   language: string
 ): Promise<PrescriptionData | null> => {
+  const cleanedTranscript = (transcript || '').replace(/\s+/g, ' ').trim();
+  if (!cleanedTranscript || cleanedTranscript.length < 40) {
+    console.warn("generateClinicalNote: Transcript too short to safely generate notes. Skipping.");
+    return null;
+  }
   const dictionaryContext = JSON.stringify(prescriptionDictionary);
   const protocolsContext = JSON.stringify(CLINICAL_PROTOCOLS);
 
@@ -340,7 +357,12 @@ export const generateClinicalNote = async (
       },
     });
 
-    return JSON.parse(response.text || 'null') as PrescriptionData;
+    const raw = response.text || 'null';
+    const parsed = JSON.parse(raw) as PrescriptionData | null;
+    if (!parsed) {
+      console.warn("generateClinicalNote: Model returned null/empty note.");
+    }
+    return parsed;
   } catch (error) {
     console.error("Unified clinical note generation error:", error);
     return null;

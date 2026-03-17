@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { DoctorProfile, TranscriptEntry, PrescriptionData } from '../types';
 import { generateClinicalNote } from '../services/geminiService';
+import { hasMeaningfulTranscript } from '../utils/transcriptGuards';
 
 const UPDATE_THRESHOLD = 3; // Number of new segments to trigger an update
 const DEBOUNCE_MS = 2000; // Wait for 2 seconds of silence before updating
@@ -51,8 +52,13 @@ export const useLiveScribe = (
         // Actually, we should check against what we HAVE processed, not just started.
         // For simplicity, let's just use the current ref length at start.
 
-        setIsGenerating(true);
         const currentTranscript = latestTranscriptRef.current;
+        if (!hasMeaningfulTranscript(currentTranscript)) {
+            console.warn("useLiveScribe: Skipping background note generation – transcript too short.");
+            return;
+        }
+
+        setIsGenerating(true);
         const fullText = currentTranscript.map(t => `${t.speaker}: ${t.text}`).join('\n');
 
         // Update the marker immediately so we don't re-trigger for these segments

@@ -11,6 +11,7 @@ import { renderMarkdownToHTML } from '../utils/markdownRenderer';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { hasMeaningfulTranscript, isTranscriptTooShortForNotes } from '../utils/transcriptGuards';
 
 interface ScribeSessionViewProps {
     onEndSession: () => void;
@@ -661,6 +662,16 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({
             setShowTranscript(true);
             return;
         }
+
+        const latestTranscript = transcriptHistoryRef.current;
+        if (isTranscriptTooShortForNotes(latestTranscript)) {
+            const confirmEnd = window.confirm(
+                "We haven’t captured enough audio to generate reliable notes yet.\n\nEnd session anyway without notes?"
+            );
+            if (!confirmEnd) {
+                return;
+            }
+        }
         stopListening();
         setPhase('processing');
         const finalBlob = await stopRecording();
@@ -754,12 +765,12 @@ export const ScribeSessionView: React.FC<ScribeSessionViewProps> = ({
 
         let latestTranscript = transcriptHistoryRef.current;
         if (latestTranscript.length === 0 && transcriptHistory.length > 0) latestTranscript = transcriptHistory;
-        const fullTranscript = latestTranscript.map(t => `${t.speaker}: ${t.text}`).join('\n');
-
-        if (!fullTranscript.trim()) {
-            setClinicalNote("Generated");
+        if (!hasMeaningfulTranscript(latestTranscript)) {
+            toast.error('Need a bit more transcript before we can safely generate notes.');
             return;
         }
+
+        const fullTranscript = latestTranscript.map(t => `${t.speaker}: ${t.text}`).join('\n');
 
         const noteData = await generateClinicalNote(fullTranscript, doctorProfile, sessionLanguage);
         if (noteData) {
