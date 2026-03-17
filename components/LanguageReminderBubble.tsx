@@ -26,10 +26,10 @@ export const LanguageReminderBubble: React.FC<LanguageReminderBubbleProps> = ({ 
                 </div>
                 <div className="flex-1">
                     <p className="text-sm font-semibold text-slate-900">
-                        Choose your consultation language
+                        Start by choosing your consultation language
                     </p>
                     <p className="mt-1 text-xs text-slate-600">
-                        For the best experience, confirm the language you usually speak with patients.
+                        This helps Aivana Doc transcribe and generate notes in the right language from your very first session.
                     </p>
                     <div className="mt-3 flex items-center gap-2">
                         <button

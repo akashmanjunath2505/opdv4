@@ -216,10 +216,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                         </p>
                         {isFreeTier && (
                             <button
-                                onClick={() => setShowContactForm(prev => !prev)}
+                                onClick={() => window.open('https://calendly.com/abhisheknahire89/30min', '_blank', 'noopener,noreferrer')}
                                 className="text-[11px] md:text-sm text-[#3B6FE0] md:text-blue-600 hover:text-blue-700 font-medium mt-1"
                             >
-                                {showContactForm ? 'Hide contact form' : 'Contact us to upgrade →'}
+                                Contact us to upgrade →
                             </button>
                         )}
                     </div>
@@ -240,12 +240,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onStartSession, onUpgrade 
                                         : 'Upgrade to increase your daily session limit and get priority support.'}
                                 </p>
                                 {casesRemaining === 0 && (
-                                    <button
-                                        onClick={() => setShowContactForm(true)}
-                                        className="text-sm bg-[#3B6FE0] hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
-                                    >
-                                        Contact us to buy
-                                    </button>
+                                <button
+                                    onClick={() => window.open('https://calendly.com/abhisheknahire89/30min', '_blank', 'noopener,noreferrer')}
+                                    className="text-sm bg-[#3B6FE0] hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
+                                >
+                                    Contact us to buy
+                                </button>
                                 )}
                             </div>
                         </div>

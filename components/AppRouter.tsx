@@ -163,12 +163,12 @@ export const AppRouter: React.FC = () => {
         const parsed = rawCount ? parseInt(rawCount, 10) : 0;
         const currentCount = Number.isNaN(parsed) ? 0 : parsed;
 
-        if (currentCount < 3) {
+        if (!showLanguageReminder && currentCount < 3) {
             const nextCount = currentCount + 1;
             localStorage.setItem(reminderKey, String(nextCount));
             setShowLanguageReminder(true);
         }
-    }, [user, loading, profileIncomplete, inSession, showPricing]);
+    }, [user, loading, profileIncomplete, inSession, showPricing, showLanguageReminder]);
 
     // Loading state
     if (loading) {
@@ -290,6 +290,7 @@ export const AppRouter: React.FC = () => {
                         localStorage.setItem(`has_seen_onboarding_${user.id}`, 'true');
                     }
                     setShowDashboardTour(false);
+                    setShowLanguageReminder(true);
                 }}
                 onMissingTarget={() => {
                     setDashboardTourStep((prev) => Math.min(dashboardSteps.length - 1, prev + 1));
