@@ -15,6 +15,9 @@ import { CLINICAL_PROTOCOLS } from '../knowledgeBase';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Enable extra logging for transcript decisions when needed
+const SAFE_TRANSCRIPTION_DEBUG = process.env.SAFE_TRANSCRIPTION_DEBUG === 'true';
+
 const SUPPORTED_LANGUAGES = ["English", "Hindi", "Marathi", "Gujarati", "Tamil", "Telugu", "Kannada", "Malayalam", "Bengali", "Punjabi", "Odia", "Assamese", "Urdu"];
 
 // ... (existing exports)
@@ -73,31 +76,32 @@ export const processAudioSegment = async (
     return null;
   }
   const systemInstruction = `
-    You are an advanced Medical Scribe specialized in Indian clinical contexts.
+    You are a STRICT speech-to-text engine for clinical conversations in Indian contexts.
 
-    TASK: Perform a two - pass transcription for this clinical audio segment.
+    PRIMARY GOAL:
+    - Transcribe exactly what is spoken by each speaker, with minimal changes.
 
-      PASS 1(Phonetic Capture): Capture raw speech verbatim.Handle code - switching(e.g., Hindi + English) and regional accents naturally.
-        PASS 2(Semantic & Medical Normalization): Refine the raw capture into professional clinical text.
-    - Normalize regional terms(e.g., "chakkar" to "dizziness/vertigo", "bukhaar" to "fever").
-    - Correct medical terms and medication names.
-    - Maintain the primary language script of the speaker but ensure clinical clarity.
+    RULES (VERY IMPORTANT):
+    1. Do NOT paraphrase, expand, or \"make it sound better\".
+    2. Do NOT translate between languages. If the doctor speaks Hindi, keep Hindi; if English, keep English; mixed speech should stay mixed.
+    3. Preserve short utterances exactly (e.g. "hello", "haan", "theek hai") without turning them into full sentences.
+    4. If you are unsure of some words, prefer leaving them empty or using '...' rather than guessing new medical content.
+    5. Never invent new symptoms, diagnoses, tests, or advice that were not clearly spoken.
 
-    DIARIZATION: Identify "Doctor" and "Patient".
-      CONTEXT: Use previous dialogue for speaker consistency: "${previousContext}"
-    
-    LANGUAGE DETECTION & SCRIPT: 
+    DIARIZATION:
+    - Identify speaker as "Doctor" or "Patient" ONLY when it is clear from the audio and previous context:
+      Previous context: "${previousContext}"
+    - Do NOT create extra turns just to balance the dialogue.
+
+    LANGUAGE HANDLING:
     ${language === 'Auto-detect'
-      ? 'Automatically detect the language of each speaker turn. Use native scripts (Devanagari, Tamil, etc.).'
-      : `Primary Language Hint: ${language}. Preferably use the native script for ${language}, but automatically detect and handle other languages if the speaker switches.`
+      ? 'Automatically detect the language of each speaker turn. Keep the same script the speaker uses as far as possible.'
+      : `Primary Language Hint: ${language}. Use that language where appropriate but still follow exactly what is spoken.`
     }
-  - Use Devanagari for Hindi / Marathi, Tamil script for Tamil, etc.
-    - For English medical terms interleaved in native speech, keep them in English / Roman script if that's standard clinical practice in India.
 
-  RULES:
-  1. Return ONLY valid JSON array of objects.
-    2. Do NOT use markdown formatting.
-    3. Ensure high accuracy for Indian accents and multilingual conversations.
+    OUTPUT FORMAT:
+    - Return ONLY a JSON array of objects with fields: speaker, text, detectedLanguage.
+    - No markdown, no commentary, no extra keys.
   `;
 
   try {
@@ -129,12 +133,46 @@ export const processAudioSegment = async (
 
     const raw = response.text || '[]';
     const parsed = JSON.parse(raw) as { speaker: 'Doctor' | 'Patient'; text: string }[];
+
     // Filter out any empty or whitespace-only turns
-    const cleaned = parsed.filter(p => p && typeof p.text === 'string' && p.text.trim().length > 0);
+    let cleaned = parsed
+      .filter(p => p && typeof p.text === 'string')
+      .map(p => ({ ...p, text: p.text.trim() }))
+      .filter(p => p.text.length > 0);
+
     if (cleaned.length === 0) {
       console.warn("processAudioSegment: Model returned no usable transcript; skipping segment.");
       return null;
     }
+
+    // Very short-utterance safety: if any turn looks suspiciously long given no prior context,
+    // cap the length to avoid the model inventing a full conversation from a tiny input.
+    const hadContext = !!previousContext && previousContext.trim().length > 0;
+    if (!hadContext) {
+      cleaned = cleaned.map(turn => {
+        const wordCount = turn.text.split(/\s+/).length;
+        if (wordCount > 40) {
+          // Truncate to first 40 words to stay closer to what was likely spoken.
+          const truncated = turn.text.split(/\s+/).slice(0, 40).join(' ');
+          if (SAFE_TRANSCRIPTION_DEBUG) {
+            console.warn("processAudioSegment: Truncating unusually long first segment transcript.", {
+              originalWords: wordCount
+            });
+          }
+          return { ...turn, text: truncated };
+        }
+        return turn;
+      });
+    }
+
+    if (SAFE_TRANSCRIPTION_DEBUG) {
+      console.log("processAudioSegment: Final transcript turns:", cleaned.map(t => ({
+        speaker: t.speaker,
+        textSample: t.text.slice(0, 120),
+        length: t.text.length
+      })));
+    }
+
     return cleaned;
   } catch (error) {
     console.error("Segment processing error:", error);
